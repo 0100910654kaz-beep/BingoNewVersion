@@ -1,4 +1,4 @@
-FROM tomcat:9.0-jdk11-corretto
+FROM tomcat:10.1-jdk11-corretto
 
 # タイムゾーンを日本に設定
 ENV TZ=Asia/Tokyo
@@ -20,8 +20,8 @@ RUN mkdir -p /usr/local/tomcat/webapps/ROOT && \
 # Javaファイルをコンパイルして配置するディレクトリを作成
 RUN mkdir -p /usr/local/tomcat/webapps/ROOT/WEB-INF/classes
 
-# Javaファイルをフォルダー内から自動で見つけてコンパイル
-RUN find . -name "*.java" | xargs javac -classpath /usr/local/tomcat/lib/servlet-api.jar -d /usr/local/tomcat/webapps/ROOT/WEB-INF/classes
+# Javaファイルをフォルダー内から自動で見つけてTomcat 10環境でコンパイル
+RUN find . -name "*.java" | xargs javac -classpath /usr/local/tomcat/lib/tomcat-servlet-api.jar -d /usr/local/tomcat/webapps/ROOT/WEB-INF/classes
 
 # ポート番号の設定（Render用）
 EXPOSE 8080
