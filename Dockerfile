@@ -20,8 +20,8 @@ RUN mkdir -p /usr/local/tomcat/webapps/ROOT && \
 # Javaファイルをコンパイルして配置するディレクトリを作成
 RUN mkdir -p /usr/local/tomcat/webapps/ROOT/WEB-INF/classes
 
-# Javaファイルをフォルダー内から自動で見つけてTomcat 10環境でコンパイル
-RUN find . -name "*.java" | xargs javac -classpath /usr/local/tomcat/lib/tomcat-servlet-api.jar -d /usr/local/tomcat/webapps/ROOT/WEB-INF/classes
+# Javaファイルをフォルダー内から自動で見つけてTomcat 10の共通ライブラリを使ってコンパイル
+RUN find . -name "*.java" | xargs javac -classpath "/usr/local/tomcat/lib/*" -d /usr/local/tomcat/webapps/ROOT/WEB-INF/classes
 
 # ポート番号の設定（Render用）
 EXPOSE 8080
