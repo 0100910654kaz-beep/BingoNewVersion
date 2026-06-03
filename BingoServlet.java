@@ -62,7 +62,7 @@ public class BingoServlet extends HttpServlet {
         }
 
         // ==========================================================
-        // 【アクション 2】ゲームのリセット（司会者 F5連動）
+        // 【アクション 2】ゲームのリセット（司会者）
         // ==========================================================
         else if ("reset".equals(action)) {
             application.removeAttribute("game");
@@ -100,6 +100,9 @@ public class BingoServlet extends HttpServlet {
                 int nextNumber = shuffledNumbers.remove(0);
                 game.getDrawnNumbers().add(nextNumber);
                 application.setAttribute("shuffledNumbers", shuffledNumbers);
+                
+                // 🚀【全自動機能】数字が引かれた瞬間、参加者全員のカードを裏側で一斉自動スキャン！
+                game.checkAllPlayers();
             }
             
             request.setAttribute("game", game);
@@ -108,7 +111,7 @@ public class BingoServlet extends HttpServlet {
         }
 
         // ==========================================================
-        // 【アクション 4】プレイヤーの参加ログイン（ここで5×5カードを生成！）
+        // 【アクション 4】プレイヤーの参加ログイン
         // ==========================================================
         else if ("join".equals(action)) {
             String inputId = request.getParameter("gameId");
@@ -117,10 +120,11 @@ public class BingoServlet extends HttpServlet {
             if (game.getGameId().equals(inputId)) {
                 String confirmedName = game.registerPlayer(inputName);
                 
-                // 🚀 【重要】大山さん仕様の5×5ビンゴカード（FREE付き）をここで自動生成！
-                if (session.getAttribute("card") == null) {
-                    List<List<String>> card = new ArrayList<>();
-                    // B(1-15), I(16-30), N(31-45), G(46-60), O(61-75) のルールで数字を作ります
+                // 5×5ビンゴカードの自動生成（未生成の場合のみ）
+                @SuppressWarnings("unchecked")
+                List<List<String>> card = (List<List<String>>) session.getAttribute("card");
+                if (card == null) {
+                    card = new ArrayList<>();
                     List<List<Integer>> columns = new ArrayList<>();
                     for (int i = 0; i < 5; i++) {
                         List<Integer> pool = new ArrayList<>();
@@ -131,21 +135,23 @@ public class BingoServlet extends HttpServlet {
                         columns.add(pool.subList(0, 5));
                     }
                     
-                    // 縦列から横行の5×5の形に変換してカードを組み立て
                     for (int r = 0; r < 5; r++) {
                         List<String> row = new ArrayList<>();
                         for (int c = 0; c < 5; c++) {
                             if (r == 2 && c == 2) {
-                                row.add("0"); // 真ん中はFREE（0）
+                                row.add("0"); // FREEマス
                             } else {
                                 row.add(String.valueOf(columns.get(c).get(r)));
                             }
                         }
                         card.add(row);
                     }
-                    // セッション（記憶部屋）に「card」という名前でしっかり保存！
                     session.setAttribute("card", card);
+                    session.setAttribute("myConfirmedName", confirmedName); // 自分の名前をセッションにロック
                 }
+                
+                // 🚀【全自動機能】生成したカードをBingoGame（サーバー頭脳）に登録し、初期スキャンを走らせる
+                game.setPlayerCard(confirmedName, card);
                 
                 request.setAttribute("game", game);
                 request.setAttribute("confirmedPlayerName", confirmedName);
@@ -158,31 +164,15 @@ public class BingoServlet extends HttpServlet {
         }
 
         // ==========================================================
-        // 【アクション 5】プレイヤーからの即時リーチ報告
+        // 【アクション 5・6】手動ボタン廃止のため、リクエストが来たら正常終了だけ返す安全弁
         // ==========================================================
-        else if ("reach".equals(action)) {
-            String playerName = request.getParameter("playerName");
-            if (playerName != null && !playerName.trim().isEmpty()) {
-                game.addReachPlayer(playerName);
-            }
+        else if ("reach".equals(action) || "bingo".equals(action)) {
             response.setStatus(HttpServletResponse.SC_OK);
             return;
         }
 
         // ==========================================================
-        // 【アクション 6】プレイヤーからの即時ビンゴ報告
-        // ==========================================================
-        else if ("bingo".equals(action)) {
-            String playerName = request.getParameter("playerName");
-            if (playerName != null && !playerName.trim().isEmpty()) {
-                game.addBingoPlayer(playerName); 
-            }
-            response.setStatus(HttpServletResponse.SC_OK);
-            return;
-        }
-
-        // ==========================================================
-        // 【定期通信用】10秒ごとのアップデート
+        // 【定期通信用】5秒・10秒ごとのアップデート
         // ==========================================================
         String userType = request.getParameter("userType");
         request.setAttribute("game", game);
@@ -190,8 +180,12 @@ public class BingoServlet extends HttpServlet {
         if ("admin".equals(userType)) {
             request.getRequestDispatcher("admin.jsp").forward(request, response);
         } else {
-            String playerName = request.getParameter("playerName");
-            request.setAttribute("confirmedPlayerName", playerName);
+            // セッションから確実に名前を復元してJSPに渡す
+            String confirmedName = (String) session.getAttribute("myConfirmedName");
+            if (confirmedName == null) {
+                confirmedName = request.getParameter("playerName");
+            }
+            request.setAttribute("confirmedPlayerName", confirmedName);
             request.getRequestDispatcher("index.jsp").forward(request, response);
         }
     }
