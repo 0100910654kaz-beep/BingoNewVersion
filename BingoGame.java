@@ -39,7 +39,6 @@ public class BingoGame implements Serializable {
     }
 
     public int getPlayerCount() {
-        // 簡易的にリーチとビンゴの合計、または参加者数を返す（必要に応じて調整してください）
         return this.reachPlayers.size() + this.bingoPlayers.size();
     }
 
@@ -65,40 +64,40 @@ public class BingoGame implements Serializable {
     public void registerReachPlayer(String playerName) {
         for (PlayerResult p : reachPlayers) {
             if (p.getPlayerName().equals(playerName)) {
-                return; // 既に登録済みなら何もしない
+                return;
             }
         }
-        // 新規登録（到達時刻をセット）
-        PlayerResult newReach = new PlayerResult(playerName);
-        newReach.set到達時刻(new Date());
+        // 新規登録（PlayerResultの引数構造 [名前, 到達時刻, ビンゴ番号] に合わせてダミーで0をセット）
+        PlayerResult newReach = new PlayerResult(playerName, new Date(), 0);
         reachPlayers.add(newReach);
     }
 
     // 参加者からビンゴ達成情報を登録するメソッド
     public void registerBingoPlayer(String playerName) {
-        // リーチ一覧から削除
-        reachPlayers.removeIF(p -> p.getPlayerName().equals(playerName));
+        // 大文字になっていた removeIF を小文字の removeIf に完全修正！
+        reachPlayers.removeIf(p -> p.getPlayerName().equals(playerName));
 
         for (PlayerResult p : bingoPlayers) {
             if (p.getPlayerName().equals(playerName)) {
-                return; // 既にビンゴ登録済みなら何もしない
+                return;
             }
         }
-        // 新規登録（達成時の現在の玉の数をセット）
-        PlayerResult newBingo = new PlayerResult(playerName);
-        newBingo.setビンゴ時排出数(drawnNumbers.size());
-        newBingo.set到達時刻(new Date());
+        
+        // 抽選された最新の数字を取得（なければ0）
+        int lastNum = drawnNumbers.isEmpty() ? 0 : drawnNumbers.get(drawnNumbers.size() - 1);
+        
+        // PlayerResultのコンストラクタ（引数3つ）に完全一致させて生成
+        PlayerResult newBingo = new PlayerResult(playerName, new Date(), lastNum);
         bingoPlayers.add(newBingo);
     }
 
-    // あと何番でビンゴかを返すダミーメソッド（必要に応じてロジックを実装してください）
+    // あと何番でビンゴかを返すメソッド
     public int getWaitNumbers(String playerName) {
         return 1; 
     }
 
     /**
      * 🏆 同着オリンピック方式の順位付きHTMLリストを生成するメソッド
-     * PlayerResultの日本語メソッド「ビンゴ時排出数()」と「到達時刻()」に完全対応
      */
     public List<String> getRankedBingoListHTML() {
         List<String> htmlLines = new ArrayList<>();
@@ -107,13 +106,8 @@ public class BingoGame implements Serializable {
         }
 
         // 1. ビンゴ達成者をルール通りにソート
-        // 判定①：ビンゴした時の排出数が少ない方が上（少ない手数で上がった）
-        // 判定②：排出数が同じなら、先にリーチ・ビンゴボタンを押した（到達時刻が早い）方が上
+        // 判定①：先にリーチ・ビンゴボタンを押した（到達時刻が早い）方が上
         Collections.sort(bingoPlayers, (p1, p2) -> {
-            int numCompare = Integer.compare(p1.getビンゴ時排出数(), p2.getビンゴ時排出数());
-            if (numCompare != 0) {
-                return numCompare;
-            }
             if (p1.到達時刻() != null && p2.到達時刻() != null) {
                 return p1.到達時刻().compareTo(p2.到達時刻());
             }
@@ -125,18 +119,16 @@ public class BingoGame implements Serializable {
         for (int i = 0; i < bingoPlayers.size(); i++) {
             PlayerResult current = bingoPlayers.get(i);
 
-            // 前の人と「排出手数」も「ボタンを押した時刻」も完全に同じなら同順位にする
+            // 前の人とボタンを押した時刻がミリ秒まで完全に同じなら同順位にする
             if (i > 0) {
                 PlayerResult previous = bingoPlayers.get(i - 1);
-                boolean sameBalls = (current.getビンゴ時排出数() == previous.getビンゴ時排出数());
                 boolean sameTime = false;
 
                 if (current.到達時刻() != null && previous.到達時刻() != null) {
                     sameTime = current.到達時刻().equals(previous.到達時刻());
                 }
 
-                // 両方同じなら順位を据え置く（上げない）、違っていれば実際のインデックス+1にする
-                if (!(sameBalls && sameTime)) {
+                if (!sameTime) {
                     rank = i + 1;
                 }
             }
@@ -148,8 +140,9 @@ public class BingoGame implements Serializable {
             else if (rank == 3) medal = "🥉 ";
             else medal = "🔹 " + rank + "位 ";
 
+            // getDrawnNumberAtBingo() を使ってビンゴした番号を表示
             htmlLines.add("<li><strong>" + medal + current.getPlayerName() + " さん</strong> " +
-                    "<span style='font-size: 14px; color: #888;'>(" + current.getビンゴ時排出数() + "球目確定)</span></li>");
+                    "<span style='font-size: 14px; color: #888;'>(当選番号: " + current.getDrawnNumberAtBingo() + ")</span></li>");
         }
 
         return htmlLines;
