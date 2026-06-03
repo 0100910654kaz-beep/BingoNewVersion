@@ -8,7 +8,7 @@
     BingoGame game = (BingoGame) request.getAttribute("game");
     String gameId = (game != null) ? game.getGameId() : "まだ開始していません";
 
-    // 🚀【⑪最新順ロジック】出た数字のリストを逆順（最新が先頭）にしたリストを作る
+    // 出た数字のリストを逆順（最新が先頭）にしたリストを作る
     List<Integer> reverseDrawnNumbers = new ArrayList<>();
     if (game != null) {
         reverseDrawnNumbers.addAll(game.getDrawnNumbers());
@@ -37,7 +37,7 @@
         .panel { flex: 1; background: #f9f9f9; padding: 15px; border-radius: 8px; text-align: left; box-shadow: inset 0 0 5px rgba(0,0,0,0.05); }
         .panel h3 { margin-top: 0; color: #2b3a42; border-bottom: 2px solid #ddd; padding-bottom: 5px; }
         
-        /* 🚀 最新順履歴グリッド */
+        /* 最新順履歴グリッド */
         .history-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; margin-top: 10px; }
         .history-cell { background: #ddd; padding: 8px; font-size: 16px; font-weight: bold; border-radius: 4px; text-align: center; color: #444; }
         .history-cell.newest { background: #ff6b6b; color: white; animation: blink 0.8s infinite alternate; }
@@ -48,76 +48,72 @@
     </style>
 
     <script>
-        // 🚀【⑧ ⑬ ショートカットキーの実装】
+        // ショートカットキーの実装
         window.addEventListener("keydown", function(event) {
-            // ⑬ Enterキーで次の番号を引く
             if (event.key === "Enter") {
                 let drawBtn = document.getElementById("drawButton");
                 if (drawBtn) {
-                    event.preventDefault(); // 余計な挙動を防止
+                    event.preventDefault();
                     drawBtn.click();
                 }
             }
-            // ⑧ Escキーで確認リセット
             if (event.key === "Escape") {
                 event.preventDefault();
                 confirmReset();
             }
         });
 
-        // 安全なリセットのための確認メッセージ
         function confirmReset() {
             if (confirm("⚠️ 本当にビンゴゲームをリセットしますか？\n（出た数字や参加者のデータがすべて消去されます）")) {
                 window.location.href = "BingoServlet?action=reset";
             }
         }
 
-        // 🚀【⑦ 2画面化：プロジェクター専用ウィンドウの立ち上げ】
+        // 🚀【修正版】JSPの誤解（EL式エラー）を回避する大画面構築ロジック
         function openProjectorScreen() {
             let screenWindow = window.open("", "BingoProjector", "width=1000,height=750,top=100,left=100,resizable=yes");
             
-            // 2画面目のHTML中身を構築して流し込む
-            let htmlContent = `
-            <html>
-            <head>
-                <title>ビンゴ中継大画面</title>
-                <style>
-                    body { font-family: Arial, sans-serif; background-color: #1a1a1a; color: white; text-align: center; padding: 40px; margin: 0; }
-                    .title { font-size: 42px; color: #ff6b6b; font-weight: bold; margin-bottom: 20px; letter-spacing: 4px; }
-                    .main-box { display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 40px; }
-                    .label { font-size: 28px; color: #aaa; margin-bottom: 10px; }
-                    .num-display { font-size: 180px; font-weight: bold; color: #fff; background: #ff6b6b; padding: 20px 100px; border-radius: 30px; box-shadow: 0 0 30px rgba(255,107,107,0.6); line-height: 1; }
-                    .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 15px; max-width: 1100px; margin: 0 auto; padding: 20px; background: #2a2a2a; border-radius: 15px; }
-                    .cell { background: #444; padding: 15px 0; font-size: 32px; font-weight: bold; border-radius: 8px; color: #bbb; }
-                    .cell.new { background: #ff6b6b; color: white; font-size: 42px; box-shadow: 0 0 15px #ff6b6b; animation: scaleUp 0.5s ease-out; }
-                    .winner-box { font-size: 24px; background: #333; padding: 15px; border-radius: 10px; max-width: 600px; margin: 30px auto 0; text-align: left; border-left: 8px solid #ff6b6b; }
-                    @keyframes scaleUp { from { transform: scale(0.5); } to { transform: scale(1); } }
-                </style>
-                <script>
-                    // 5秒ごとに親画面からデータを盗んで自動更新する仕組み
-                    setInterval(function() {
-                        if (window.opener && !window.opener.closed) {
-                            window.location.reload();
-                        }
-                    }, 4000);
-                <\/script>
-            </head>
-            <body>
-                <div class="title">🎉 ビンゴ大会 抽選生中継 🎉</div>
-                <div class="main-box">
-                    <div class="label">現在の当選番号</div>
-                    <div class="num-display">${document.querySelector('.big-number') ? document.querySelector('.big-number').innerText : '待機中'}</div>
-                </div>
-                <div class="label" style="text-align:left; max-width:1100px; margin:0 auto 10px;">📊 出た数字の履歴（最新が左上）</div>
-                <div class="grid">
-                    ${document.querySelector('.history-grid') ? document.querySelector('.history-grid').innerHTML.replace(/history-cell/g, 'cell').replace(/newest/g, 'new') : '<div style="grid-column: span 10; font-size:24px; color:#666;">まだ数字はありません</div>'}
-                </div>
-                <div class="winner-box">
-                    <strong>🏆 ビンゴ達成者上位:</strong><br>
-                    ${document.getElementById('bingoList') ? document.getElementById('bingoList').innerHTML : '<li>まだいません</li>'}
-                </div>
-            </body>
-            </html>`;
+            let currentNum = document.querySelector('.big-number') ? document.querySelector('.big-number').innerText : '待機中';
+            let historyHtml = document.querySelector('.history-grid') ? document.querySelector('.history-grid').innerHTML.replace(/history-cell/g, 'cell').replace(/newest/g, 'new') : '<div style="grid-column: span 10; font-size:24px; color:#666;">まだ数字はありません</div>';
+            let bingoListHtml = document.getElementById('bingoList') ? document.getElementById('bingoList').innerHTML : '<li>まだいません</li>';
+
+            let htmlContent = '<html>' +
+            '<head>' +
+            '    <title>ビンゴ中継大画面</title>' +
+            '    <style>' +
+            '        body { font-family: Arial, sans-serif; background-color: #1a1a1a; color: white; text-align: center; padding: 40px; margin: 0; }' +
+            '        .title { font-size: 42px; color: #ff6b6b; font-weight: bold; margin-bottom: 20px; letter-spacing: 4px; }' +
+            '        .main-box { display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 40px; }' +
+            '        .label { font-size: 28px; color: #aaa; margin-bottom: 10px; }' +
+            '        .num-display { font-size: 180px; font-weight: bold; color: #fff; background: #ff6b6b; padding: 20px 100px; border-radius: 30px; box-shadow: 0 0 30px rgba(255,107,107,0.6); line-height: 1; }' +
+            '        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 15px; max-width: 1100px; margin: 0 auto; padding: 20px; background: #2a2a2a; border-radius: 15px; }' +
+            '        .cell { background: #444; padding: 15px 0; font-size: 32px; font-weight: bold; border-radius: 8px; color: #bbb; }' +
+            '        .cell.new { background: #ff6b6b; color: white; font-size: 42px; box-shadow: 0 0 15px #ff6b6b; animation: scaleUp 0.5s ease-out; }' +
+            '        .winner-box { font-size: 24px; background: #333; padding: 15px; border-radius: 10px; max-width: 600px; margin: 30px auto 0; text-align: left; border-left: 8px solid #ff6b6b; }' +
+            '        @keyframes scaleUp { from { transform: scale(0.5); } to { transform: scale(1); } }' +
+            '    </style>' +
+            '    <script>' +
+            '        setInterval(function() {' +
+            '            if (window.opener && !window.opener.closed) {' +
+            '                window.location.reload();' +
+            '            }' +
+            '        }, 4000);' +
+            '    <\/script>' +
+            '</head>' +
+            '<body>' +
+            '    <div class="title">🎉 ビンゴ大会 抽選生中継 🎉</div>' +
+            '    <div class="main-box">' +
+            '        <div class="label">現在の当選番号</div>' +
+            '        <div class="num-display">' + currentNum + '</div>' +
+            '    </div>' +
+            '    <div class="label" style="text-align:left; max-width:1100px; margin:0 auto 10px;">📊 出た数字の履歴（最新が左上）</div>' +
+            '    <div class="grid">' + historyHtml + '</div>' +
+            '    <div class="winner-box">' +
+            '        <strong>🏆 ビンゴ達成者上位:</strong><br>' +
+            '        <ul>' + bingoListHtml + '</ul>' +
+            '    </div>' +
+            '</body>' +
+            '</html>';
             
             screenWindow.document.open();
             screenWindow.document.write(htmlContent);
