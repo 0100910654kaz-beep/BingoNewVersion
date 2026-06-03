@@ -23,16 +23,11 @@ public class BingoServlet extends HttpServlet {
         
         request.setCharacterEncoding("UTF-8");
         String action = request.getParameter("action");
-        String gameId = request.getParameter("gameId");
         ServletContext application = getServletContext();
         HttpSession session = request.getSession();
         
-        // サーバーから現在のゲーム（部屋）を取得
         BingoGame game = (BingoGame) application.getAttribute("game");
 
-        // ==========================================================
-        // 【アクション 1】部屋の新規作成（司会者）
-        // ==========================================================
         if ("create".equals(action)) {
             String validDaysStr = request.getParameter("validDays");
             int validDays = 8; 
@@ -45,7 +40,6 @@ public class BingoServlet extends HttpServlet {
             }
             
             String newGameId = "88888888"; 
-            
             game = new BingoGame(newGameId, validDays);
             application.setAttribute("game", game);
             
@@ -61,20 +55,13 @@ public class BingoServlet extends HttpServlet {
             return;
         }
 
-        // ==========================================================
-        // 【アクション 2】ゲームのリセット（司会者）
-        // ==========================================================
         else if ("reset".equals(action)) {
             application.removeAttribute("game");
             application.removeAttribute("shuffledNumbers");
-            
             request.getRequestDispatcher("admin.jsp").forward(request, response);
             return;
         }
 
-        // ==========================================================
-        // 共通チェック：部屋が存在しないとエラー
-        // ==========================================================
         if (game == null) {
             request.setAttribute("error", "⚠️ 現在ビンゴゲームは開始されていないか、リセットされました。");
             request.getRequestDispatcher("index.jsp").forward(request, response);
@@ -89,9 +76,6 @@ public class BingoServlet extends HttpServlet {
             return;
         }
 
-        // ==========================================================
-        // 【アクション 3】次の番号を引く（司会者）
-        // ==========================================================
         if ("draw".equals(action)) {
             @SuppressWarnings("unchecked")
             List<Integer> shuffledNumbers = (List<Integer>) application.getAttribute("shuffledNumbers");
@@ -101,7 +85,7 @@ public class BingoServlet extends HttpServlet {
                 game.getDrawnNumbers().add(nextNumber);
                 application.setAttribute("shuffledNumbers", shuffledNumbers);
                 
-                // 🚀【全自動機能】数字が引かれた瞬間、参加者全員のカードを裏側で一斉自動スキャン！
+                // 全プレイヤーのカードを一斉自動スキャン
                 game.checkAllPlayers();
             }
             
@@ -110,9 +94,6 @@ public class BingoServlet extends HttpServlet {
             return;
         }
 
-        // ==========================================================
-        // 【アクション 4】プレイヤーの参加ログイン
-        // ==========================================================
         else if ("join".equals(action)) {
             String inputId = request.getParameter("gameId");
             String inputName = request.getParameter("playerName");
@@ -120,7 +101,6 @@ public class BingoServlet extends HttpServlet {
             if (game.getGameId().equals(inputId)) {
                 String confirmedName = game.registerPlayer(inputName);
                 
-                // 5×5ビンゴカードの自動生成（未生成の場合のみ）
                 @SuppressWarnings("unchecked")
                 List<List<String>> card = (List<List<String>>) session.getAttribute("card");
                 if (card == null) {
@@ -139,7 +119,7 @@ public class BingoServlet extends HttpServlet {
                         List<String> row = new ArrayList<>();
                         for (int c = 0; c < 5; c++) {
                             if (r == 2 && c == 2) {
-                                row.add("0"); // FREEマス
+                                row.add("0"); 
                             } else {
                                 row.add(String.valueOf(columns.get(c).get(r)));
                             }
@@ -147,10 +127,10 @@ public class BingoServlet extends HttpServlet {
                         card.add(row);
                     }
                     session.setAttribute("card", card);
-                    session.setAttribute("myConfirmedName", confirmedName); // 自分の名前をセッションにロック
+                    session.setAttribute("myConfirmedName", confirmedName);
                 }
                 
-                // 🚀【全自動機能】生成したカードをBingoGame（サーバー頭脳）に登録し、初期スキャンを走らせる
+                // カードをサーバー頭脳に登録して初期スキャン
                 game.setPlayerCard(confirmedName, card);
                 
                 request.setAttribute("game", game);
@@ -163,24 +143,12 @@ public class BingoServlet extends HttpServlet {
             return;
         }
 
-        // ==========================================================
-        // 【アクション 5・6】手動ボタン廃止のため、リクエストが来たら正常終了だけ返す安全弁
-        // ==========================================================
-        else if ("reach".equals(action) || "bingo".equals(action)) {
-            response.setStatus(HttpServletResponse.SC_OK);
-            return;
-        }
-
-        // ==========================================================
-        // 【定期通信用】5秒・10秒ごとのアップデート
-        // ==========================================================
         String userType = request.getParameter("userType");
         request.setAttribute("game", game);
         
         if ("admin".equals(userType)) {
             request.getRequestDispatcher("admin.jsp").forward(request, response);
         } else {
-            // セッションから確実に名前を復元してJSPに渡す
             String confirmedName = (String) session.getAttribute("myConfirmedName");
             if (confirmedName == null) {
                 confirmedName = request.getParameter("playerName");
