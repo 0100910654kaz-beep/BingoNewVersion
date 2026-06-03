@@ -1,6 +1,7 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ page import="servlet.BingoGame" %>
 <%@ page import="servlet.PlayerResult" %>
+<%@ page import="java.util.List" %>
 <%
     BingoGame game = (BingoGame) request.getAttribute("game");
     String error = (String) request.getAttribute("error");
@@ -13,6 +14,12 @@
     }
     if (playerName == null) {
         playerName = "";
+    }
+
+    // サーバーからこのプレイヤーの5×5ビンゴカードを取得
+    List<List<String>> bingoCard = null;
+    if (game != null && !playerName.isEmpty()) {
+        bingoCard = game.getPlayerCard(playerName);
     }
 %>
 <!DOCTYPE html>
@@ -35,11 +42,18 @@
         .btn:disabled { background-color: #ccc !important; cursor: not-allowed; }
         .input-text { padding: 10px; font-size: 16px; width: 80%; max-width: 300px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px; text-align: center; }
         .list-box { text-align: left; background: #f9f9f9; padding: 10px; border-radius: 5px; margin-top: 20px; }
+        
+        /* ビンゴカード専用の綺麗なスタイル設定 */
+        .bingo-table { margin: 20px auto; border-collapse: collapse; background: #fff; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
+        .bingo-cell { width: 60px; height: 60px; border: 2px solid #ddd; font-size: 22px; font-weight: bold; text-align: center; vertical-align: middle; color: #333; }
+        /* 真ん中のFREEマスや、当選した数字のマスを赤く染める設定 */
+        .hit { background-color: #ff6b6b !important; color: white !important; }
+        .free-cell { background-color: #ffe3e3; color: #ff6b6b; font-size: 14px; }
     </style>
 
     <% if (game != null) { %>
     <script>
-        // 【大山さん大金星の低燃費モード】10秒ごとに裏側で静かに最新の数字や順位だけを問い合わせる
+        // 【大山さん大金星の低燃費モード】10秒ごとに裏側で静かに最新の数字や順位、カードの状態を問い合わせる
         function checkUpdate() {
             fetch('BingoServlet?userType=player&playerName=<%= java.net.URLEncoder.encode(playerName, "UTF-8") %>')
                 .then(response => {
@@ -61,9 +75,11 @@
                     
                     let newNumberBox = doc.querySelector('.number-box');
                     let newListBox = doc.querySelector('.list-box');
+                    let newBingoTable = doc.querySelector('.bingo-table'); // カードの部分も自動更新に追従
                     
                     if (newNumberBox) document.querySelector('.number-box').innerHTML = newNumberBox.innerHTML;
                     if (newListBox) document.querySelector('.list-box').innerHTML = newListBox.innerHTML;
+                    if (newBingoTable) document.querySelector('.bingo-table').innerHTML = newBingoTable.innerHTML;
                 })
                 .catch(err => console.log("通信エラー:", err));
         }
@@ -72,17 +88,14 @@
 
         // 【新機能】リーチ・ビンゴの「0秒即時送信」ギミック
         function sendAction(actionType, buttonElement) {
-            // 連打によるサーバー破壊をガード（1.5秒間ボタンを無効化）
             buttonElement.disabled = true;
             setTimeout(() => { buttonElement.disabled = false; }, 1500);
 
-            // 10秒を待たず、今この瞬間にサーバーへ電光石火で通知！
             let url = 'BingoServlet?action=' + actionType + '&playerName=' + encodeURIComponent('<%= playerName %>');
             
             fetch(url)
                 .then(response => {
                     if(response.ok) {
-                        // 送信が成功したら、手元の画面をすぐに最新状態に1回更新する
                         checkUpdate();
                     } else {
                         alert("通信が混み合っています。もう一度お試しください。");
@@ -121,6 +134,28 @@
         <div class="number-box">
             <%= game.getDrawnNumbers().isEmpty() ? "待機中" : game.getDrawnNumbers().get(game.getDrawnNumbers().size() - 1) %>
         </div>
+
+        <!-- 🚀 ここに5×5のビンゴカードを表示するプログラムを追加しました！ -->
+        <% if (bingoCard != null) { %>
+            <table class="bingo-table">
+                <% for (int r = 0; r < 5; r++) { %>
+                    <tr>
+                        <% for (int c = 0; c < 5; c++) { 
+                            String num = bingoCard.get(r).get(c);
+                            boolean isHit = game.getDrawnNumbers().contains(Integer.parseInt(num)) || num.equals("0");
+                            
+                            if (num.equals("0")) { %>
+                                <td class="bingo-cell free-cell hit">FREE</td>
+                            <% } else { %>
+                                <td class="bingo-cell <%= isHit ? "hit" : "" %>"><%= num %></td>
+                            <% } 
+                        } %>
+                    </tr>
+                <% } %>
+            </table>
+        <% } else { %>
+            <p style="color:red; font-weight:bold;">カード情報を取得できませんでした。</p>
+        <% } %>
 
         <div style="margin-top: 20px;">
             <button type="button" class="btn btn-reach" onclick="sendAction('reach', this)">リーチ！</button>
