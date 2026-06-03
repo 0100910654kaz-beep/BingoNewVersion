@@ -67,7 +67,6 @@ public class BingoGame implements Serializable {
     }
 
     public void registerBingoPlayer(String playerName) {
-        // 安全なループで削除処理
         reachPlayers.removeIf(p -> p.getPlayerName().equals(playerName));
 
         for (PlayerResult p : bingoPlayers) {
