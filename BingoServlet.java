@@ -7,7 +7,6 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 
 @WebServlet("/BingoServlet")
 public class BingoServlet extends HttpServlet {
@@ -15,8 +14,11 @@ public class BingoServlet extends HttpServlet {
     private static BingoGame game;
 
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        request.setCharacterEncoding("UTF-8");
         String action = request.getParameter("action");
+        String userType = request.getParameter("userType");
 
+        // 司会者による部屋作成
         if ("create".equals(action)) {
             String gameId = UUID.randomUUID().toString().substring(0, 6);
             game = new BingoGame(gameId);
@@ -25,6 +27,7 @@ public class BingoServlet extends HttpServlet {
             return;
         }
 
+        // 司会者による抽選
         if ("draw".equals(action)) {
             if (game != null) {
                 game.drawNumber();
@@ -34,33 +37,60 @@ public class BingoServlet extends HttpServlet {
             return;
         }
 
-        if ("status".equals(action)) {
-            response.setContentType("application/json");
-            response.setCharacterEncoding("UTF-8");
-            if (game == null) {
-                response.getWriter().write("{\"started\":false}");
+        // プレイヤーの新規参加処理
+        if ("join".equals(action)) {
+            String gameId = request.getParameter("gameId");
+            String playerName = request.getParameter("playerName");
+
+            if (game == null || !game.getGameId().equalsIgnoreCase(gameId)) {
+                request.setAttribute("error", "指定された部屋番号（" + gameId + "）が見つかりません。");
+                request.getRequestDispatcher("index.jsp").forward(request, response);
+                return;
+            }
+
+            if (playerName == null || playerName.trim().isEmpty()) {
+                playerName = "プレイヤー_" + (game.getPlayerCount() + 1);
             } else {
-                response.getWriter().write("{\"started\":true,\"drawnNumbers\":" + game.getDrawnNumbers().toString() + "}");
+                playerName = playerName.trim();
+            }
+
+            request.setAttribute("game", game);
+            request.setAttribute("confirmedPlayerName", playerName);
+            request.getRequestDispatcher("index.jsp").forward(request, response);
+            return;
+        }
+
+        // 【低燃費モード】非同期での状態更新
+        if ("player".equals(userType)) {
+            String playerName = request.getParameter("playerName");
+            request.setAttribute("game", game);
+            request.setAttribute("confirmedPlayerName", playerName);
+            request.getRequestDispatcher("index.jsp").forward(request, response);
+            return;
+        }
+
+        // リーチ・ビンゴのJavaScriptフェッチ処理
+        if ("reach".equals(action) || "bingo".equals(action)) {
+            String playerName = request.getParameter("playerName");
+            if (game != null && playerName != null && !playerName.isEmpty()) {
+                if ("reach".equals(action)) {
+                    game.registerReachPlayer(playerName);
+                } else {
+                    game.registerBingoPlayer(playerName);
+                }
+                response.setStatus(HttpServletResponse.SC_OK);
+            } else {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             }
             return;
         }
 
+        // デフォルトは管理画面へ
         request.setAttribute("game", game);
         request.getRequestDispatcher("admin.jsp").forward(request, response);
     }
 
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        request.setCharacterEncoding("UTF-8");
-        String action = request.getParameter("action");
-        String playerName = request.getParameter("playerName");
-
-        if (game != null && playerName != null && !playerName.trim().isEmpty()) {
-            if ("reach".equals(action)) {
-                game.registerReachPlayer(playerName);
-            } else if ("bingo".equals(action)) {
-                game.registerBingoPlayer(playerName);
-            }
-        }
-        response.sendRedirect("player.jsp");
+        doGet(request, response);
     }
 }
