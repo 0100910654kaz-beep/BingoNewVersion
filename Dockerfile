@@ -1,19 +1,17 @@
-FROM tomcat:10.1-jdk11-corretto
+# ベースイメージとして、大山さんのコード（javax.servlet）と互換性があるTomcat 9環境を指定
+FROM tomcat:9.0-jdk11-corretto
 
-# タイムゾーンを日本に設定
-ENV TZ=Asia/Tokyo
-
-# 既存のROOTアプリケーションを削除し、正しい配置用のフォルダを作成
+# TomcatのデフォルトのWelcomeページを削除し、クラス配置用のフォルダを作成
 RUN rm -rf /usr/local/tomcat/webapps/ROOT && \
     mkdir -p /usr/local/tomcat/webapps/ROOT/WEB-INF/classes
 
-# 作業スペースを作成
+# 作業ディレクトリを /app に設定
 WORKDIR /app
 
-# リポジトリ内のすべてのファイルを一旦コピー
+# リポジトリ内のすべてのファイルをコンテナの /app にコピー
 COPY . .
 
-# JSPファイル（プレイヤー画面・司会者画面）をROOT直下に確実に配置
+# JSPファイルをTomcatの公開ディレクトリ（ROOT直下）に配置
 RUN find . -name "index.jsp" -exec cp {} /usr/local/tomcat/webapps/ROOT/ \; && \
     find . -name "admin.jsp" -exec cp {} /usr/local/tomcat/webapps/ROOT/ \;
 
@@ -21,8 +19,7 @@ RUN find . -name "index.jsp" -exec cp {} /usr/local/tomcat/webapps/ROOT/ \; && \
 RUN find . -name "*.java" | xargs javac -classpath "/usr/local/tomcat/lib/*" -d /usr/local/tomcat/webapps/ROOT/WEB-INF/classes
 
 # 【カード表示のための重要設定】セッション（記憶部屋）のクッキーパスをEclipse互換に強制変更
-RUN sed -i 's/<Context>/<Context sessionCookiePathUsesTrailingSlash="false">/' /usr/local/tomcat/conf/context.xml
+RUN sed -i 's/<Context>/<Context sessionCookiePath="\/">/' /usr/local/tomcat/conf/context.xml
 
-# ポート番号の設定（Render用）
-EXPOSE 8080
+# コンテナ起動時にTomcatサーバーを走らせる
 CMD ["catalina.sh", "run"]
