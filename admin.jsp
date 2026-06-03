@@ -1,13 +1,59 @@
-<script>
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ page import="servlet.BingoGame" %>
+<%@ page import="servlet.PlayerResult" %>
+<%@ page import="java.util.List" %>
+<%@ page import="java.util.ArrayList" %>
+<%@ page import="java.util.Collections" %>
+<%
+    BingoGame game = (BingoGame) request.getAttribute("game");
+    String gameId = (game != null) ? game.getGameId() : "まだ開始していません";
+
+    List<Integer> reverseDrawnNumbers = new ArrayList<>();
+    int ballCount = 0;
+    if (game != null) {
+        reverseDrawnNumbers.addAll(game.getDrawnNumbers());
+        ballCount = reverseDrawnNumbers.size();
+        Collections.reverse(reverseDrawnNumbers);
+    }
+%>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>ビンゴ大会 - 司会者画面</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #eef2f3; padding: 20px; text-align: center; }
+        .admin-container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { color: #2b3a42; margin-bottom: 20px; }
+        .info-panel { background: #f0f4f8; padding: 15px; border-radius: 8px; margin-bottom: 25px; font-size: 18px; }
+        .big-number { font-size: 80px; font-weight: bold; color: #ff6b6b; background: #ffe3e3; display: inline-block; padding: 10px 50px; border-radius: 15px; margin: 15px 0; border: 3px solid #ff6b6b; }
+        .control-box { margin: 20px 0; }
+        .btn { display: inline-block; padding: 14px 28px; font-size: 20px; font-weight: bold; color: white; border: none; border-radius: 6px; cursor: pointer; margin: 10px; text-decoration: none; }
+        .btn-draw { background-color: #2b8a3e; box-shadow: 0 4px #1e622b; }
+        .btn-draw:active { transform: translateY(4px); box-shadow: none; }
+        .btn-reset { background-color: #e63946; font-size: 16px; padding: 10px 20px; }
+        .btn-screen { background-color: #4a90e2; font-size: 16px; padding: 10px 20px; }
+        
+        .flex-box { display: flex; justify-content: space-between; margin-top: 30px; gap: 20px; }
+        .panel { flex: 1; background: #f9f9f9; padding: 15px; border-radius: 8px; text-align: left; box-shadow: inset 0 0 5px rgba(0,0,0,0.05); }
+        .panel h3 { margin-top: 0; color: #2b3a42; border-bottom: 2px solid #ddd; padding-bottom: 5px; }
+        
+        .history-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; margin-top: 10px; }
+        .history-cell { background: #ddd; padding: 8px; font-size: 16px; font-weight: bold; border-radius: 4px; text-align: center; color: #444; }
+        .history-cell.newest { background: #ff6b6b; color: white; animation: blink 0.8s infinite alternate; }
+        @keyframes blink { from { opacity: 1; } to { opacity: 0.7; } }
+        ul { padding-left: 20px; }
+        li { margin-bottom: 8px; font-size: 16px; }
+    </style>
+
+    <script>
         let screenWindow = null;
 
-        // 🚀【改善】「次の数字を引く」を押した瞬間に大画面を強制同期する仕掛け
-        function triggerDraw(event) {
-            // 通常の画面遷移（リロード）を一度止め、裏で確実に大画面を書き換えてから遷移させる
+        // 🚀【劇的改善】「次の数字を引く」がクリック／Enter押された瞬間に大画面を即時同期
+        function triggerDraw() {
             if (screenWindow && !screenWindow.closed) {
-                // ボタンが押された直後に、現在の大画面の「待機中」や「前の数字」をフェードアウトさせるなど、
-                // 司会者画面が切り替わる一瞬の隙間も大画面を即時連動させる安全弁
-                setTimeout(updateProjectorData, 50); 
+                // 画面遷移（リロード）が発生する一瞬の隙間にも、大画面側に現在の最新状態を即時反映させておく安全弁
+                setTimeout(updateProjectorData, 50);
             }
         }
 
@@ -16,7 +62,7 @@
                 let drawBtn = document.getElementById("drawButton");
                 if (drawBtn) { 
                     event.preventDefault(); 
-                    triggerDraw(); // 大画面連動のトリガーを引く
+                    triggerDraw(); // キーボードEnter時も即時トリガー
                     drawBtn.click(); 
                 }
             }
@@ -29,7 +75,7 @@
             }
         }
 
-        // 📺 3列並び特大プロジェクター大画面の構築
+        // 📺 横並び3列配置の特大プロジェクター大画面を生成
         function openProjectorScreen() {
             screenWindow = window.open("", "BingoProjector", "width=1300,height=800,top=50,left=50,resizable=yes");
             
@@ -37,17 +83,25 @@
             '<style>' +
             'body { font-family: Arial, sans-serif; background-color: #111; color: white; padding: 20px; margin: 0; overflow-x: hidden; }' +
             '.header { text-align: center; font-size: 44px; color: #ffeb3b; font-weight: bold; margin-bottom: 25px; text-shadow: 0 0 10px rgba(255,235,59,0.5); letter-spacing: 2px; }' +
+            
+            // 3列フレックスレイアウト
             '.main-layout { display: flex; justify-content: space-between; gap: 20px; align-items: stretch; max-width: 1400px; margin: 0 auto; height: calc(100vh - 120px); }' +
+            
+            // 左列（特大数字）
             '.left-col { flex: 1.1; background: #222; border-radius: 15px; padding: 20px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px solid #333; box-shadow: 0 8px 16px rgba(0,0,0,0.5); }' +
             '.num-title { font-size: 32px; color: #bbb; font-weight: bold; margin-bottom: 10px; }' +
             '.num-display { font-size: 190px; font-weight: bold; color: #fff; background: radial-gradient(circle, #ff6b6b 0%, #e63946 100%); padding: 30px 60px; border-radius: 25px; line-height: 1; box-shadow: 0 0 30px rgba(230,57,70,0.6); border: 4px solid #fff; min-width: 220px; text-align: center; }' +
             '.ball-counter { font-size: 26px; color: #ffb74d; margin-top: 20px; font-weight: bold; background: #333; padding: 8px 20px; border-radius: 20px; }' +
+            
+            // 中央列（履歴グリッド）
             '.center-col { flex: 1.5; background: #1a1a1a; border-radius: 15px; padding: 20px; border: 2px solid #333; display: flex; flex-direction: column; box-shadow: 0 8px 16px rgba(0,0,0,0.5); }' +
             '.col-title { font-size: 26px; color: #4fc3f7; font-weight: bold; margin-bottom: 15px; border-bottom: 3px solid #4fc3f7; padding-bottom: 5px; text-align: left; }' +
             '.grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; overflow-y: auto; padding-right: 5px; }' +
             '.cell { background: #333; padding: 12px 0; font-size: 24px; font-weight: bold; border-radius: 8px; color: #888; text-align: center; border: 1px solid #444; }' +
             '.cell.new { background: #ff6b6b; color: white; font-size: 32px; box-shadow: 0 0 15px #ff6b6b; border: 2px solid #fff; animation: pulse 0.5s infinite alternate; }' +
             '@keyframes pulse { from { transform: scale(1); } to { transform: scale(1.03); } }' +
+            
+            // 右列（ランキングとリーチ）
             '.right-col { flex: 1.3; background: #222; border-radius: 15px; padding: 20px; border: 2px solid #333; display: flex; flex-direction: column; gap: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); overflow-y: auto; text-align: left; }' +
             '.section-box { background: #1a1a1a; padding: 15px; border-radius: 10px; border-left: 6px solid #e91e63; }' +
             '.section-box.reach-box { border-left-color: #ff9800; }' +
@@ -58,15 +112,18 @@
             
             '<div class="header">🎉 ビンゴ大会 抽選生中継 🎉</div>' +
             '<div class="main-layout">' +
+                '' +
                 '<div class="left-col">' +
                     '<div class="num-title">現在の当選番号</div>' +
                     '<div class="num-display" id="p-num">待機中</div>' +
                     '<div class="ball-counter" id="p-ball">0 / 75 球</div>' +
                 '</div>' +
+                '' +
                 '<div class="center-col">' +
                     '<div class="col-title">📊 出た数字の履歴（最新が左上）</div>' +
                     '<div class="grid" id="p-grid"></div>' +
                 '</div>' +
+                '' +
                 '<div class="right-col">' +
                     '<div class="section-box">' +
                         '<div class="right-title" style="color:#e91e63;">🏆 ビンゴ達成者一覧</div>' +
@@ -86,13 +143,13 @@
             updateProjectorData(); 
         }
 
-        // 親から子画面にデータを送り込む（0秒即時連動対応）
+        // 親から子画面（大画面）にデータを直接流し込む超軽量・防エラーロジック
         function updateProjectorData() {
             if (screenWindow && !screenWindow.closed) {
                 let pNum = screenWindow.document.getElementById('p-num');
                 let pGrid = screenWindow.document.getElementById('p-grid');
-                let pList = screenWindow.document.getElementById('bingoList'); // IDのズレを完璧に修正
-                let pReach = screenWindow.document.getElementById('adminReachList'); // IDのズレを完璧に修正
+                let pList = screenWindow.document.getElementById('bingoList'); 
+                let pReach = screenWindow.document.getElementById('adminReachList'); 
                 let pBall = screenWindow.document.getElementById('p-ball');
 
                 if(pNum && document.querySelector('.big-number')) pNum.innerText = document.querySelector('.big-number').innerText;
@@ -103,7 +160,7 @@
             }
         }
 
-        // 5秒に1回のバックグラウンド非同期同期（これでダブルセーフティ）
+        // 5秒おきのバックグラウンド非同期更新（常時接続・ダブル安全弁）
         setInterval(function() {
             fetch('BingoServlet?userType=admin')
                 .then(response => response.text())
@@ -112,13 +169,35 @@
                     let doc = parser.parseFromString(html, 'text/html');
                     if(doc.querySelector('.admin-container')) {
                         document.querySelector('.admin-container').innerHTML = doc.querySelector('.admin-container').innerHTML;
-                        updateProjectorData(); // データの書き換え直後に大画面へパス
+                        updateProjectorData(); // 内部データ書き換え直後に大画面へ最速転送
                     }
-                }).catch(e => console.log("同期エラー:", e));
+                }).catch(e => console.log("バックグラウンド同期エラー:", e));
         }, 5000);
 
-        // 🚀【重要】JSPがロードされた瞬間（ボタンを押してリロードされた直後）に大画面を即座に最新にする
+        // 🚀【重要】ボタンを押してサーブレットから画面がリロードされた直後に大画面を瞬時に100%同期
         window.addEventListener("DOMContentLoaded", function() {
             updateProjectorData();
         });
     </script>
+</head>
+<body>
+
+<div class="admin-container">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" class="btn btn-reset" onclick="confirmReset()">🔄 リセット [Esc]</button>
+        <h1>🎤 司会者コントロール画面 🎤</h1>
+        <button type="button" class="btn btn-screen" onclick="openProjectorScreen()">📺 大画面を開く</button>
+    </div>
+
+    <% if (game == null) { %>
+        <div class="info-panel" style="background: #ffe3e3;">
+            <p>まだビンゴゲームの部屋が作成されていません。</p>
+            <form action="BingoServlet" method="get">
+                <input type="hidden" name="action" value="create">
+                <button type="submit" class="btn btn-draw" style="box-shadow:none;">🚀 新規ビンゴ部屋を開始する</button>
+            </form>
+        </div>
+    <% } else { %>
+        <div class="info-panel">
+            <strong>現在の管理部屋ID:</strong> <span style="color:#4a90e2; font-weight:bold;"><%= gameId %></span> &nbsp;&nbsp;|&nbsp;&nbsp;
+            <strong>現在の
