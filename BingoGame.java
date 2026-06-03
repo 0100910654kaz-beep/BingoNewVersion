@@ -67,6 +67,7 @@ public class BingoGame implements Serializable {
     }
 
     public void registerBingoPlayer(String playerName) {
+        // 安全なループで削除処理
         reachPlayers.removeIf(p -> p.getPlayerName().equals(playerName));
 
         for (PlayerResult p : bingoPlayers) {
@@ -80,17 +81,5 @@ public class BingoGame implements Serializable {
 
     public int getWaitNumbers(String playerName) {
         return 1; 
-    }
-
-    // エラーの原因になりやすいロジックを排除し、シンプルなリストを返すように一時変更
-    public List<String> getRankedBingoListHTML() {
-        List<String> htmlLines = new ArrayList<>();
-        int rank = 1;
-        for (PlayerResult p : bingoPlayers) {
-            htmlLines.add("<li><strong>🔹 " + rank + "位 " + p.getPlayerName() + " さん</strong> " +
-                    "<span style='font-size: 14px; color: #888;'>(当選番号: " + p.getDrawnNumberAtBingo() + ")</span></li>");
-            rank++;
-        }
-        return htmlLines;
     }
 }
