@@ -6,24 +6,36 @@ import java.util.Date;
 public class PlayerResult implements Serializable, Comparable<PlayerResult> {
     private static final long serialVersionUID = 1L;
 
-    private String playerName;          // プレイヤー名
-    private Date reachedTime;           // 達成した日時（ミリ秒単位まで正確に記録）
-    private int drawnNumberAtBingo;     // 【新機能】ビンゴ（またはリーチ）した瞬間の当選番号
+    private String プレイヤー名;
+    private Date 到達時刻;
+    private int ビンゴで描かれた数字;
 
-    public PlayerResult(String playerName, Date reachedTime, int drawnNumberAtBingo) {
-        this.playerName = playerName;
-        this.reachedTime = reachedTime;
-        this.drawnNumberAtBingo = drawnNumberAtBingo;
+    // コンストラクタ
+    public PlayerResult(String プレイヤー名, Date 到達時刻, int ビンゴで描かれた数字) {
+        this.プレイヤー名 = プレイヤー名;
+        this.到達時刻 = 到達時刻;
+        this.ビンゴで描かれた数字 = ビンゴで描かれた数字;
     }
 
-    public String getPlayerName() { return playerName; }
-    public Date getReachedTime() { return reachedTime; }
-    public int getDrawnNumberAtBingo() { return drawnNumberAtBingo; } // ビンゴ番号を取り出す部品
+    // 司会者画面やロジックで使うためのゲッターメソッド
+    public String getPlayerName() {
+        return プレイヤー名;
+    }
 
-    // 最新の達成者ほど「上（リストの先頭）」に並び替えるためのロジック
-    // （※BingoGame側で先頭に追加する形に補強したため、このメソッドは安全のために残してあります）
+    public Date 到達時刻() {
+        return 到達時刻;
+    }
+
+    public int getDrawnNumberAtBingo() {
+        return ビンゴで描かれた数字;
+    }
+
+    // 最新の達成者ほど上（リストの先頭）に並べるためのロジック
     @Override
-    public int compareTo(PlayerResult other) {
-        return other.getReachedTime().compareTo(this.reachedTime);
+    public int compareTo(PlayerResult 他の) {
+        if (他の.到達時刻() == null || this.到達時刻 == null) {
+            return 0;
+        }
+        return 他の.到達時刻().compareTo(this.到達時刻);
     }
 }
