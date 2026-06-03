@@ -225,7 +225,7 @@
                     if (game.getBingoPlayers() != null) {
                         for (PlayerResult p : game.getBingoPlayers()) { 
                     %>
-                        <li><strong><%= rank %>位</strong>: <%= p.getPlayerName() %> さん <span style="color:#e63946; font-weight:bold;">(🔑<%= p.getDrawnNumberAtBingo() %>番でビンゴ! / ⏱️<%= p.getFormattedTime() %>)</span></li>
+                        <li><strong><%= rank %>位</strong>: <%= p.getPlayerName() %> さん <span style="color:#e63946; font-weight:bold;">(🔑<%= p.getDrawnNumberAtBingo() %>番でビンゴ!)</span></li>
                     <% 
                         rank++;
                         }
@@ -244,7 +244,7 @@
                     if (game.getReachPlayers() != null) {
                         for (PlayerResult p : game.getReachPlayers()) { 
                     %>
-                        <li><strong><%= p.getPlayerName() %> さん</strong> <span style="color: #ff9800; font-size: 14px; font-weight: bold;">（あと <%= game.getWaitNumbers(p.getPlayerName()) %> 番でビンゴ！）</span></li>
+                        <li><strong><%= p.getPlayerName() %> さん</strong></li>
                     <% 
                         }
                     } 
