@@ -2,187 +2,156 @@ package servlet;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 public class BingoGame implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private String gameId;
-    private int validDays;
-    private long createTime;
-    private long lastBingoTime;
+    private List<Integer> drawnNumbers;
+    private List<Integer> lotteryMachine;
+    private List<PlayerResult> reachPlayers;
+    private List<PlayerResult> bingoPlayers;
 
-    private List<Integer> drawnNumbers = new CopyOnWriteArrayList<>();
-    private List<PlayerResult> bingoPlayers = new CopyOnWriteArrayList<>();
-    private List<PlayerResult> reachPlayers = new CopyOnWriteArrayList<>();
-
-    private Map<String, List<List<String>>> playerCards = new ConcurrentHashMap<>();
-
-    public BingoGame(String gameId, int validDays) {
+    // コンストラクタ
+    public BingoGame(String gameId) {
         this.gameId = gameId;
-        this.validDays = validDays;
-        this.createTime = System.currentTimeMillis();
-        this.lastBingoTime = 0;
-    }
+        this.drawnNumbers = new ArrayList<>();
+        this.lotteryMachine = new ArrayList<>();
+        this.reachPlayers = new ArrayList<>();
+        this.bingoPlayers = new ArrayList<>();
 
-    public String getGameId() { return gameId; }
-    public List<Integer> getDrawnNumbers() { return drawnNumbers; }
-    public List<PlayerResult> getBingoPlayers() { return bingoPlayers; }
-    public List<PlayerResult> getReachPlayers() { return reachPlayers; }
-    public int getPlayerCount() { return playerCards.size(); }
-
-    public boolean isExpired() {
-        long duration = (long) validDays * 24 * 60 * 60 * 1000;
-        return (System.currentTimeMillis() - createTime) > duration;
-    }
-
-    public boolean isPast2HoursFromLastBingo() {
-        if (lastBingoTime == 0) return false;
-        return (System.currentTimeMillis() - lastBingoTime) > (2 * 60 * 60 * 1000);
-    }
-
-    public synchronized String registerPlayer(String name) {
-        if (name == null || name.trim().isEmpty()) {
-            name = "ゲスト" + (getPlayerCount() + 1);
+        // 1〜75の玉をマシンにセット
+        for (int i = 1; i <= 75; i++) {
+            this.lotteryMachine.add(i);
         }
-        name = name.trim();
-        
-        String uniqueName = name;
-        int count = 1;
-        while (playerCards.containsKey(uniqueName)) {
-            uniqueName = name + count;
-            count++;
+        Collections.shuffle(this.lotteryMachine);
+    }
+
+    public String getGameId() {
+        return gameId;
+    }
+
+    public List<Integer> getDrawnNumbers() {
+        return drawnNumbers;
+    }
+
+    public int getPlayerCount() {
+        // 簡易的にリーチとビンゴの合計、または参加者数を返す（必要に応じて調整してください）
+        return this.reachPlayers.size() + this.bingoPlayers.size();
+    }
+
+    // 抽選するメソッド
+    public int drawNumber() {
+        if (lotteryMachine.isEmpty()) {
+            return -1;
         }
-        return uniqueName;
+        int num = lotteryMachine.remove(0);
+        drawnNumbers.add(num);
+        return num;
     }
 
-    public synchronized void setPlayerCard(String playerName, List<List<String>> card) {
-        playerCards.put(playerName, card);
-        checkPlayerStatus(playerName, card);
+    public List<PlayerResult> getReachPlayers() {
+        return reachPlayers;
     }
 
-    public synchronized void checkAllPlayers() {
-        for (Map.Entry<String, List<List<String>>> entry : playerCards.entrySet()) {
-            checkPlayerStatus(entry.getKey(), entry.getValue());
+    public List<PlayerResult> getBingoPlayers() {
+        return bingoPlayers;
+    }
+
+    // 参加者からリーチ情報を登録・更新するメソッド
+    public void registerReachPlayer(String playerName) {
+        for (PlayerResult p : reachPlayers) {
+            if (p.getPlayerName().equals(playerName)) {
+                return; // 既に登録済みなら何もしない
+            }
         }
+        // 新規登録（到達時刻をセット）
+        PlayerResult newReach = new PlayerResult(playerName);
+        newReach.set到達時刻(new Date());
+        reachPlayers.add(newReach);
     }
 
-    private void checkPlayerStatus(String playerName, List<List<String>> card) {
-        boolean alreadyBingo = false;
+    // 参加者からビンゴ達成情報を登録するメソッド
+    public void registerBingoPlayer(String playerName) {
+        // リーチ一覧から削除
+        reachPlayers.removeIF(p -> p.getPlayerName().equals(playerName));
+
         for (PlayerResult p : bingoPlayers) {
             if (p.getPlayerName().equals(playerName)) {
-                alreadyBingo = true;
-                break;
+                return; // 既にビンゴ登録済みなら何もしない
             }
         }
-
-        int minMissing = 99;
-        List<int[]> lines = getAllLines();
-
-        for (int[] line : lines) {
-            int missingCount = 0;
-            for (int i = 0; i < 5; i++) {
-                int r = line[i * 2];
-                int c = line[i * 2 + 1];
-                String numStr = card.get(r).get(c);
-                int num = Integer.parseInt(numStr);
-
-                if (num != 0 && !drawnNumbers.contains(num)) {
-                    missingCount++;
-                }
-            }
-            if (missingCount < minMissing) {
-                minMissing = missingCount;
-            }
-        }
-
-        if (minMissing == 0 && !alreadyBingo) {
-            int lastNum = drawnNumbers.isEmpty() ? 0 : drawnNumbers.get(drawnNumbers.size() - 1);
-            bingoPlayers.add(new PlayerResult(playerName, new Date(), lastNum));
-            lastBingoTime = System.currentTimeMillis();
-            
-            reachPlayers.removeIf(p -> p.getPlayerName().equals(playerName));
-        } 
-        else if (minMissing == 1 && !alreadyBingo) {
-            boolean alreadyReach = false;
-            for (PlayerResult p : reachPlayers) {
-                if (p.getPlayerName().equals(playerName)) {
-                    alreadyReach = true;
-                    break;
-                }
-            }
-            if (!alreadyReach) {
-                reachPlayers.add(new PlayerResult(playerName, new Date(), 0));
-            }
-        }
-        else if (minMissing > 1) {
-            reachPlayers.removeIf(p -> p.getPlayerName().equals(playerName));
-        }
+        // 新規登録（達成時の現在の玉の数をセット）
+        PlayerResult newBingo = new PlayerResult(playerName);
+        newBingo.setビンゴ時排出数(drawnNumbers.size());
+        newBingo.set到達時刻(new Date());
+        bingoPlayers.add(newBingo);
     }
 
-    // 🚀【重要】同着を同じ着数（2位、2位、次は4位）にするオリンピック方式の計算
+    // あと何番でビンゴかを返すダミーメソッド（必要に応じてロジックを実装してください）
+    public int getWaitNumbers(String playerName) {
+        return 1; 
+    }
+
+    /**
+     * 🏆 同着オリンピック方式の順位付きHTMLリストを生成するメソッド
+     * PlayerResultの日本語メソッド「ビンゴ時排出数()」と「到達時刻()」に完全対応
+     */
     public List<String> getRankedBingoListHTML() {
         List<String> htmlLines = new ArrayList<>();
-        int currentRank = 1; // 表示する着数
-        int skipped = 0;     // 同着によってスキップされる数
+        if (bingoPlayers.isEmpty()) {
+            return htmlLines;
+        }
 
+        // 1. ビンゴ達成者をルール通りにソート
+        // 判定①：ビンゴした時の排出数が少ない方が上（少ない手数で上がった）
+        // 判定②：排出数が同じなら、先にリーチ・ビンゴボタンを押した（到達時刻が早い）方が上
+        Collections.sort(bingoPlayers, (p1, p2) -> {
+            int numCompare = Integer.compare(p1.getビンゴ時排出数(), p2.getビンゴ時排出数());
+            if (numCompare != 0) {
+                return numCompare;
+            }
+            if (p1.到達時刻() != null && p2.到達時刻() != null) {
+                return p1.到達時刻().compareTo(p2.到達時刻());
+            }
+            return 0;
+        });
+
+        // 2. オリンピック方式（同着を考慮）で順位付けしてHTML化
+        int rank = 1;
         for (int i = 0; i < bingoPlayers.size(); i++) {
             PlayerResult current = bingoPlayers.get(i);
-            
+
+            // 前の人と「排出手数」も「ボタンを押した時刻」も完全に同じなら同順位にする
             if (i > 0) {
                 PlayerResult previous = bingoPlayers.get(i - 1);
-                // 達成した日時（ミリ秒まで）が完全に同じか、または同じ「確定番号」で同時ビンゴした場合は同着
-                if (current.getReachTime().equals(previous.getReachTime()) || 
-                    current.getDrawnNumberAtBingo() == previous.getDrawnNumberAtBingo()) {
-                    skipped++; // 同着カウントをためる
-                } else {
-                    currentRank += skipped + 1; // スキップ分を適用して着数を進める
-                    skipped = 0;
+                boolean sameBalls = (current.getビンゴ時排出数() == previous.getビンゴ時排出数());
+                boolean sameTime = false;
+
+                if (current.到達時刻() != null && previous.到達時刻() != null) {
+                    sameTime = current.到達時刻().equals(previous.到達時刻());
+                }
+
+                // 両方同じなら順位を据え置く（上げない）、違っていれば実際のインデックス+1にする
+                if (!(sameBalls && sameTime)) {
+                    rank = i + 1;
                 }
             }
-            
-            htmlLines.add("<li><strong>" + currentRank + "位</strong>: " + current.getPlayerName() + 
-                          " さん <span style='color:#e63946; font-weight:bold;'>(🔑" + current.getDrawnNumberAtBingo() + "番でビンゴ!)</span></li>");
+
+            // 王冠やメダルの装飾付きでHTMLを生成
+            String medal = "";
+            if (rank == 1) medal = "🥇 ";
+            else if (rank == 2) medal = "🥈 ";
+            else if (rank == 3) medal = "🥉 ";
+            else medal = "🔹 " + rank + "位 ";
+
+            htmlLines.add("<li><strong>" + medal + current.getPlayerName() + " さん</strong> " +
+                    "<span style='font-size: 14px; color: #888;'>(" + current.getビンゴ時排出数() + "球目確定)</span></li>");
         }
+
         return htmlLines;
-    }
-
-    public int getWaitNumbers(String playerName) {
-        List<List<String>> card = playerCards.get(playerName);
-        if (card == null) return 0;
-
-        List<int[]> lines = getAllLines();
-        for (int[] line : lines) {
-            int missingCount = 0;
-            int missingNum = 0;
-            for (int i = 0; i < 5; i++) {
-                int r = line[i * 2];
-                int c = line[i * 2 + 1];
-                int num = Integer.parseInt(card.get(r).get(c));
-                if (num != 0 && !drawnNumbers.contains(num)) {
-                    missingCount++;
-                    missingNum = num;
-                }
-            }
-            if (missingCount == 1) {
-                return missingNum; 
-            }
-        }
-        return 0;
-    }
-
-    private List<int[]> getAllLines() {
-        List<int[]> lines = new ArrayList<>();
-        for (int i = 0; i < 5; i++) {
-            lines.add(new int[]{i,0, i,1, i,2, i,3, i,4});
-            lines.add(new int[]{0,i, 1,i, 2,i, 3,i, 4,i});
-        }
-        lines.add(new int[]{0,0, 1,1, 2,2, 3,3, 4,4});
-        lines.add(new int[]{0,4, 1,3, 2,2, 3,1, 4,0});
-        return lines;
     }
 }
