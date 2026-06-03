@@ -67,14 +67,14 @@ public class BingoGame implements Serializable {
                 return;
             }
         }
-        // 新規登録（PlayerResultの引数構造 [名前, 到達時刻, ビンゴ番号] に合わせてダミーで0をセット）
+        // 引数構造 [名前, 到達時刻, ビンゴ番号] に一致させて登録
         PlayerResult newReach = new PlayerResult(playerName, new Date(), 0);
         reachPlayers.add(newReach);
     }
 
     // 参加者からビンゴ達成情報を登録するメソッド
     public void registerBingoPlayer(String playerName) {
-        // 大文字になっていた removeIF を小文字の removeIf に完全修正！
+        // すべて小文字の removeIf に完全修正
         reachPlayers.removeIf(p -> p.getPlayerName().equals(playerName));
 
         for (PlayerResult p : bingoPlayers) {
@@ -83,10 +83,9 @@ public class BingoGame implements Serializable {
             }
         }
         
-        // 抽選された最新の数字を取得（なければ0）
+        // 最新の当選番号を取得
         int lastNum = drawnNumbers.isEmpty() ? 0 : drawnNumbers.get(drawnNumbers.size() - 1);
         
-        // PlayerResultのコンストラクタ（引数3つ）に完全一致させて生成
         PlayerResult newBingo = new PlayerResult(playerName, new Date(), lastNum);
         bingoPlayers.add(newBingo);
     }
@@ -105,23 +104,23 @@ public class BingoGame implements Serializable {
             return htmlLines;
         }
 
-        // 1. ビンゴ達成者をルール通りにソート
-        // 判定①：先にリーチ・ビンゴボタンを押した（到達時刻が早い）方が上
-        Collections.sort(bingoPlayers, (p1, p2) -> {
+        // 1. ビンゴ達成者をソート（ボタンを早く押した順に並び替え）
+        List<PlayerResult> sortedList = new ArrayList<>(bingoPlayers);
+        Collections.sort(sortedList, (p1, p2) -> {
             if (p1.到達時刻() != null && p2.到達時刻() != null) {
-                return p1.到達時刻().compareTo(p2.到達時刻());
+                return p1.到達時刻().compareTo(p2.到達時刻()); // 昇順（早い順）
             }
             return 0;
         });
 
         // 2. オリンピック方式（同着を考慮）で順位付けしてHTML化
         int rank = 1;
-        for (int i = 0; i < bingoPlayers.size(); i++) {
-            PlayerResult current = bingoPlayers.get(i);
+        for (int i = 0; i < sortedList.size(); i++) {
+            PlayerResult current = sortedList.get(i);
 
-            // 前の人とボタンを押した時刻がミリ秒まで完全に同じなら同順位にする
+            // 前の人とボタンを押した時刻がミリ秒まで完全に同じなら同順位を維持
             if (i > 0) {
-                PlayerResult previous = bingoPlayers.get(i - 1);
+                PlayerResult previous = sortedList.get(i - 1);
                 boolean sameTime = false;
 
                 if (current.到達時刻() != null && previous.到達時刻() != null) {
@@ -133,14 +132,13 @@ public class BingoGame implements Serializable {
                 }
             }
 
-            // 王冠やメダルの装飾付きでHTMLを生成
+            // メダルの装飾付きでHTMLを生成
             String medal = "";
             if (rank == 1) medal = "🥇 ";
             else if (rank == 2) medal = "🥈 ";
             else if (rank == 3) medal = "🥉 ";
             else medal = "🔹 " + rank + "位 ";
 
-            // getDrawnNumberAtBingo() を使ってビンゴした番号を表示
             htmlLines.add("<li><strong>" + medal + current.getPlayerName() + " さん</strong> " +
                     "<span style='font-size: 14px; color: #888;'>(当選番号: " + current.getDrawnNumberAtBingo() + ")</span></li>");
         }
