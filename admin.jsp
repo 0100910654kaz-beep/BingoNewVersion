@@ -102,7 +102,7 @@
 
                 <h3 style="margin-top: 25px;">🔥 リーチの人</h3>
                 <ul>
-                    <% prejudices: for (PlayerResult p : game.getReachPlayers()) { %>
+                    <% for (PlayerResult p : game.getReachPlayers()) { %>
                         <li><strong><%= p.getPlayerName() %> さん</strong></li>
                     <% } %>
                 </ul>
