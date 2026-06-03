@@ -1,169 +1,228 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ page import="servlet.BingoGame" %>
 <%@ page import="servlet.PlayerResult" %>
+<%@ page import="java.util.List" %>
+<%@ page import="java.util.ArrayList" %>
+<%@ page import="java.util.Collections" %>
 <%
-    // サーブレット側から渡されたゲームオブジェクトを取得
     BingoGame game = (BingoGame) request.getAttribute("game");
-    String gameId = (game != null) ? game.getGameId() : "";
-    
-    // 残り個数・出た個数の計算
-    int drawnCount = (game != null) ? game.getDrawnNumbers().size() : 0;
-    int remainingCount = 75 - drawnCount;
-    // 現在のリアルタイム全参加人数
-    int playerCount = (game != null) ? game.getPlayerCount() : 0;
+    String gameId = (game != null) ? game.getGameId() : "まだ開始していません";
+
+    // 🚀【⑪最新順ロジック】出た数字のリストを逆順（最新が先頭）にしたリストを作る
+    List<Integer> reverseDrawnNumbers = new ArrayList<>();
+    if (game != null) {
+        reverseDrawnNumbers.addAll(game.getDrawnNumbers());
+        Collections.reverse(reverseDrawnNumbers);
+    }
 %>
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>ビンゴ大会 - 司会者管理画面 (完全製品版)</title>
+    <title>ビンゴ大会 - 司会者画面</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background-color: #f4f7f6; padding: 20px; }
-        .container { max-width: 700px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 15px rgba(0,0,0,0.1); }
-        h1 { color: #2c3e50; margin-bottom: 5px; }
-        .setup-box { background: #e3fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #99e9f2; }
-        .game-box { background: #fff; border: 2px dashed #228be6; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-        
-        /* ステータス表示（上部） */
-        .status-container { display: flex; justify-content: space-between; margin-bottom: 15px; }
-        .counter-box { font-size: 20px; font-weight: bold; color: #2b8a3e; background: #ebfbee; padding: 10px; border-radius: 5px; border: 1px solid #b2f2bb; width: 48%; }
-        .player-box { font-size: 20px; font-weight: bold; color: #1c7ed6; background: #e7f5ff; padding: 10px; border-radius: 5px; border: 1px solid #a5d8ff; width: 48%; }
-        
-        /* プロジェクター・大画面用の超巨大表示エリア */
-        .screen-box { background: #1a1a1a; color: #fff; padding: 30px; border-radius: 10px; margin: 20px 0; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); }
-        .screen-title { color: #fab005; font-size: 18px; font-weight: bold; margin-bottom: 5px; letter-spacing: 2px; }
-        .big-number { font-size: 110px; font-weight: bold; color: #ff3e3e; text-shadow: 0 0 15px rgba(255,62,62,0.6); margin: 10px 0; line-height: 1; }
-        
-        /* 過去の数字を見やすく並べるグリッド配置 */
-        .history-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; background: #2a2a2a; padding: 15px; border-radius: 5px; max-height: 120px; overflow-y: auto; }
-        .history-num { background: #444; color: #fff; font-size: 16px; font-weight: bold; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
-        .history-latest { background: #ff3e3e !important; color: white; animation: blink 1s infinite; }
-        
-        .btn { display: inline-block; padding: 12px 30px; font-size: 18px; font-weight: bold; color: white; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; margin: 5px; }
-        .btn-create { background-color: #228be6; }
-        .btn-draw { background-color: #fab005; color: #2c3e50; font-size: 24px; width: 85%; box-shadow: 0 4px 0 #cb9102; }
+        body { font-family: Arial, sans-serif; background-color: #eef2f3; padding: 20px; text-align: center; }
+        .admin-container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { color: #2b3a42; margin-bottom: 20px; }
+        .info-panel { background: #f0f4f8; padding: 15px; border-radius: 8px; margin-bottom: 25px; font-size: 18px; }
+        .big-number { font-size: 80px; font-weight: bold; color: #ff6b6b; background: #ffe3e3; display: inline-block; padding: 10px 50px; border-radius: 15px; margin: 15px 0; border: 3px solid #ff6b6b; }
+        .control-box { margin: 20px 0; }
+        .btn { display: inline-block; padding: 14px 28px; font-size: 20px; font-weight: bold; color: white; border: none; border-radius: 6px; cursor: pointer; margin: 10px; text-decoration: none; }
+        .btn-draw { background-color: #2b8a3e; box-shadow: 0 4px #1e622b; }
         .btn-draw:active { transform: translateY(4px); box-shadow: none; }
-        .btn-reset { background-color: #fa5252; font-size: 14px; padding: 8px 16px; }
-        .select-style { padding: 10px; font-size: 16px; border-radius: 5px; margin-right: 10px; }
-        .info-text { font-size: 18px; color: #495057; line-height: 1.6; }
-        .rank-list { text-align: left; background: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 20px; }
+        .btn-reset { background-color: #e63946; font-size: 16px; padding: 10px 20px; }
+        .btn-screen { background-color: #4a90e2; font-size: 16px; padding: 10px 20px; }
         
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+        .flex-box { display: flex; justify-content: space-between; margin-top: 30px; gap: 20px; }
+        .panel { flex: 1; background: #f9f9f9; padding: 15px; border-radius: 8px; text-align: left; box-shadow: inset 0 0 5px rgba(0,0,0,0.05); }
+        .panel h3 { margin-top: 0; color: #2b3a42; border-bottom: 2px solid #ddd; padding-bottom: 5px; }
+        
+        /* 🚀 最新順履歴グリッド */
+        .history-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; margin-top: 10px; }
+        .history-cell { background: #ddd; padding: 8px; font-size: 16px; font-weight: bold; border-radius: 4px; text-align: center; color: #444; }
+        .history-cell.newest { background: #ff6b6b; color: white; animation: blink 0.8s infinite alternate; }
+        @keyframes blink { from { opacity: 1; } to { opacity: 0.7; } }
+
+        ul { padding-left: 20px; }
+        li { margin-bottom: 8px; font-size: 16px; }
     </style>
 
     <script>
-        // 【F5キー＆リセット連動の魔法・完全版】
-        function executeReset() {
-            if (confirm("本当にゲームをリセットして、新しい部屋を作り直しますか？\n（現在のデータはすべて消去され、プレイヤーの同期も再開可能になります）")) {
-                // サーブレットのリセットアクションへ正しく誘導
+        // 🚀【⑧ ⑬ ショートカットキーの実装】
+        window.addEventListener("keydown", function(event) {
+            // ⑬ Enterキーで次の番号を引く
+            if (event.key === "Enter") {
+                let drawBtn = document.getElementById("drawButton");
+                if (drawBtn) {
+                    event.preventDefault(); // 余計な挙動を防止
+                    drawBtn.click();
+                }
+            }
+            // ⑧ Escキーで確認リセット
+            if (event.key === "Escape") {
+                event.preventDefault();
+                confirmReset();
+            }
+        });
+
+        // 安全なリセットのための確認メッセージ
+        function confirmReset() {
+            if (confirm("⚠️ 本当にビンゴゲームをリセットしますか？\n（出た数字や参加者のデータがすべて消去されます）")) {
                 window.location.href = "BingoServlet?action=reset";
             }
         }
 
-        window.addEventListener('keydown', function(e) {
-            if (e.key === 'F5') {
-                e.preventDefault(); 
-                executeReset();     
-            }
-        });
+        // 🚀【⑦ 2画面化：プロジェクター専用ウィンドウの立ち上げ】
+        function openProjectorScreen() {
+            let screenWindow = window.open("", "BingoProjector", "width=1000,height=750,top=100,left=100,resizable=yes");
+            
+            // 2画面目のHTML中身を構築して流し込む
+            let htmlContent = `
+            <html>
+            <head>
+                <title>ビンゴ中継大画面</title>
+                <style>
+                    body { font-family: Arial, sans-serif; background-color: #1a1a1a; color: white; text-align: center; padding: 40px; margin: 0; }
+                    .title { font-size: 42px; color: #ff6b6b; font-weight: bold; margin-bottom: 20px; letter-spacing: 4px; }
+                    .main-box { display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 40px; }
+                    .label { font-size: 28px; color: #aaa; margin-bottom: 10px; }
+                    .num-display { font-size: 180px; font-weight: bold; color: #fff; background: #ff6b6b; padding: 20px 100px; border-radius: 30px; box-shadow: 0 0 30px rgba(255,107,107,0.6); line-height: 1; }
+                    .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 15px; max-width: 1100px; margin: 0 auto; padding: 20px; background: #2a2a2a; border-radius: 15px; }
+                    .cell { background: #444; padding: 15px 0; font-size: 32px; font-weight: bold; border-radius: 8px; color: #bbb; }
+                    .cell.new { background: #ff6b6b; color: white; font-size: 42px; box-shadow: 0 0 15px #ff6b6b; animation: scaleUp 0.5s ease-out; }
+                    .winner-box { font-size: 24px; background: #333; padding: 15px; border-radius: 10px; max-width: 600px; margin: 30px auto 0; text-align: left; border-left: 8px solid #ff6b6b; }
+                    @keyframes scaleUp { from { transform: scale(0.5); } to { transform: scale(1); } }
+                </style>
+                <script>
+                    // 5秒ごとに親画面からデータを盗んで自動更新する仕組み
+                    setInterval(function() {
+                        if (window.opener && !window.opener.closed) {
+                            window.location.reload();
+                        }
+                    }, 4000);
+                <\/script>
+            </head>
+            <body>
+                <div class="title">🎉 ビンゴ大会 抽選生中継 🎉</div>
+                <div class="main-box">
+                    <div class="label">現在の当選番号</div>
+                    <div class="num-display">${document.querySelector('.big-number') ? document.querySelector('.big-number').innerText : '待機中'}</div>
+                </div>
+                <div class="label" style="text-align:left; max-width:1100px; margin:0 auto 10px;">📊 出た数字の履歴（最新が左上）</div>
+                <div class="grid">
+                    ${document.querySelector('.history-grid') ? document.querySelector('.history-grid').innerHTML.replace(/history-cell/g, 'cell').replace(/newest/g, 'new') : '<div style="grid-column: span 10; font-size:24px; color:#666;">まだ数字はありません</div>'}
+                </div>
+                <div class="winner-box">
+                    <strong>🏆 ビンゴ達成者上位:</strong><br>
+                    ${document.getElementById('bingoList') ? document.getElementById('bingoList').innerHTML : '<li>まだいません</li>'}
+                </div>
+            </body>
+            </html>`;
+            
+            screenWindow.document.open();
+            screenWindow.document.write(htmlContent);
+            screenWindow.document.close();
+        }
+
+        // 司会者画面自体も常に5秒で裏側自動リロード
+        setInterval(function() {
+            fetch('BingoServlet?userType=admin')
+                .then(response => response.text())
+                .then(html => {
+                    let parser = new DOMParser();
+                    let doc = parser.parseFromString(html, 'text/html');
+                    if(doc.querySelector('.admin-container')) {
+                        document.querySelector('.admin-container').innerHTML = doc.querySelector('.admin-container').innerHTML;
+                    }
+                });
+        }, 5000);
     </script>
 </head>
 <body>
-<div class="container">
-    <h1>👑 ビンゴ大会 司会者管理画面</h1>
-    
-    <% if (game != null) { %>
-        <div class="status-container">
-            <div class="counter-box">🎲 残り数字： <%= remainingCount %>個 / 75個</div>
-            <div class="player-box">👥 現在の全参加者： <%= playerCount %> 名</div>
-        </div>
-    <% } %>
-    
-    <hr>
+
+<div class="admin-container">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" class="btn btn-reset" onclick="confirmReset()">🔄 リセット [Esc]</button>
+        <h1>🎤 ビンゴ大会 司会者コントロール画面 🎤</h1>
+        <button type="button" class="btn btn-screen" onclick="openProjectorScreen()">📺 大画面を開く</button>
+    </div>
 
     <% if (game == null) { %>
-        <div class="setup-box">
-            <h3>🚀 新しいビンゴゲーム（部屋）を作成する</h3>
-            <p class="info-text">有効期限（ロックタイマー）を選択してください。</p>
+        <div class="info-panel" style="background: #ffe3e3;">
+            <p>まだビンゴゲームの部屋が作成されていません。</p>
             <form action="BingoServlet" method="get">
                 <input type="hidden" name="action" value="create">
-                <select name="validDays" class="select-style">
-                    <option value="3">お試しモード（3日間有効）</option>
-                    <option value="8">通常製品版（8日間有効）</option>
-                </select>
-                <button type="submit" class="btn btn-create">部屋を新規作成する</button>
+                <label>部屋の有効日数: </label>
+                <input type="number" name="validDays" value="8" style="width:50px; padding:5px; text-align:center;"> 日間<br><br>
+                <button type="submit" class="btn btn-draw" style="box-shadow:none;">🚀 新規ビンゴ部屋(88888888)を開始する</button>
             </form>
         </div>
     <% } else { %>
-        <div class="game-box">
-            <span style="font-size: 20px; font-weight: bold; background: #ffec99; padding: 5px 10px; border-radius: 5px;">
-                🔑 部屋番号 (ゲームID): <%= gameId %>
-            </span>
-            <p class="info-text" style="margin-top: 10px; font-size: 14px; color: #868e96;">
-                ⏰ 有効期限: <%= game.getExpireTime() %> まで自動ロックタイマー作動中
-            </p>
-            
-            <p style="margin-top: 20px; font-weight: bold; color: #495057;">👇 ボタンを押すとランダムに数字を1つ引きます</p>
-            <form action="BingoServlet" method="get">
-                <input type="hidden" name="action" value="draw">
-                <button type="submit" class="btn btn-draw">🎲 次の数字を引く！</button>
-            </form>
-            
-            <div style="text-align: right; margin-top: 25px;">
-                <button type="button" class="btn btn-reset" onclick="executeReset()">⚠️ ゲームをリセット (F5)</button>
-            </div>
+        <div class="info-panel">
+            <strong>現在の管理部屋ID:</strong> <span style="color:#4a90e2; font-weight:bold;"><%= gameId %></span> &nbsp;&nbsp;|&nbsp;&nbsp;
+            <strong>現在の総参加人数:</strong> <span style="color:#2b8a3e; font-weight:bold;"><%= game.getPlayerCount() %> 名</span>
         </div>
 
-        <div class="screen-box">
-            <div class="screen-title">📺 最新の当選番号 📺</div>
-            <div class="big-number">
-                <%= game.getDrawnNumbers().isEmpty() ? "READY" : game.getDrawnNumbers().get(game.getDrawnNumbers().size() - 1) %>
+        <p style="font-size: 18px; margin-bottom: 0;">抽選された最新の数字</p>
+        <div class="big-number">
+            <%= game.getDrawnNumbers().isEmpty() ? "待機中" : game.getDrawnNumbers().get(game.getDrawnNumbers().size() - 1) %>
+        </div>
+
+        <div class="control-box">
+            <a href="BingoServlet?action=draw" id="drawButton" class="btn btn-draw">🎲 次の数字を引く [Enter]</a>
+        </div>
+
+        <div class="flex-box">
+            <div class="panel" style="flex: 1.4;">
+                <h3>📊 出た数字の履歴（最新が左上）</h3>
+                <div class="history-grid">
+                    <% for (int i = 0; i < reverseDrawnNumbers.size(); i++) { 
+                        int num = reverseDrawnNumbers.get(i);
+                        if (i == 0) { %>
+                            <div class="history-cell newest"><%= num %></div>
+                        <% } else { %>
+                            <div class="history-cell"><%= num %></div>
+                        <% }
+                    } %>
+                </div>
+                <% if (reverseDrawnNumbers.isEmpty()) { %>
+                    <p style="color:#888; text-align:center; margin-top:20px;">「次の数字を引く」ボタンを押すとスタートします！</p>
+                <% } %>
             </div>
-            
-            <div style="color: #ced4da; font-size: 14px; margin: 15px 0 5px 0; text-align: left; font-weight: bold;">📜 過去に出た数字（履歴）:</div>
-            <div class="history-grid">
-                <% if(game.getDrawnNumbers().isEmpty()) { %>
-                    <span style="color:#868e96; font-size:14px;">まだ数字は引かれていません</span>
-                <% } else { %>
-                    <% 
-                       // 最新が目立つように登録順に表示
-                       for (int i = 0; i < game.getDrawnNumbers().size(); i++) { 
-                        int num = game.getDrawnNumbers().get(i);
-                        boolean isLatest = (i == game.getDrawnNumbers().size() - 1);
-                    %>
-                        <div class="history-num <%= isLatest ? "history-latest" : "" %>">
-                            <%= num %>
-                        </div>
+
+            <div class="panel">
+                <h3>🏆 ビンゴ達成者一覧</h3>
+                <ul id="bingoList">
+                    <% int rank = 1;
+                       for (PlayerResult p : game.getBingoPlayers()) { %>
+                        <li>
+                            <strong><%= rank %>位</strong>: <%= p.getPlayerName() %> さん 
+                            <span style="color:#e63946; font-weight:bold;">(🔑<%= p.getDrawnNumberAtBingo() %>番でビンゴ!)</span>
+                        </li>
+                    <% rank++; } 
+                       if (game.getBingoPlayers().isEmpty()) { %>
+                        <p style="color:#888;">まだビンゴした人はいません</p>
                     <% } %>
-                <% } %>
-            </div>
-        </div>
+                </ul>
 
-        <div class="rank-list">
-            <h3>📊 プレイヤー側の状況確認</h3>
-            <strong>🏆 ビンゴ達成者（最新が一番上）:</strong>
-            <ul>
-                <% for (PlayerResult p : game.getBingoPlayers()) { %>
-                    <li style="font-size: 18px; margin-bottom: 5px;">
-                        <strong><%= game.getPlayerRank(p.getPlayerName()) %>位</strong>: <%= p.getPlayerName() %> さん 
-                        <span style="font-size: 14px; color: #2b8a3e; font-weight: bold;">（<%= p.getDrawnNumberAtBingo() == 0 ? "初期" : p.getDrawnNumberAtBingo() %>番でビンゴ!）</span>
-                        <span style="font-size: 12px; color: #868e96;">(<%= p.getReachedTime() %> 確定)</span>
-                    </li>
-                <% } %>
-            </ul>
-
-            <strong>🔥 リーチしている人一覧:</strong>
-            <p style="font-size: 16px; color: #e67e22;">
-                <% for (PlayerResult p : game.getReachPlayers()) { %>
-                    [<%= p.getPlayerName() %>さん] 
-                <% } %>
-            </p>
-            
-            <div style="text-align: center; margin-top: 20px;">
-                <a href="BingoServlet?userType=admin" style="font-size: 14px; color: #228be6;">🔄 画面を手動更新して最新状態にする</a>
+                <h3 style="margin-top: 25px;">🔥 リーチの人（全自動検知）</h3>
+                <ul>
+                    <% for (PlayerResult p : game.getReachPlayers()) { %>
+                        <li>
+                            <strong><%= p.getPlayerName() %> さん</strong> 
+                            <span style="color: #ff9800; font-size: 14px; font-weight: bold;">
+                                （あと <%= game.getWaitNumbers(p.getPlayerName()) %> 番でビンゴ！）
+                            </span>
+                        </li>
+                    <% } 
+                       if (game.getReachPlayers().isEmpty()) { %>
+                        <p style="color:#888;">まだリーチの人はいません</p>
+                    <% } %>
+                </ul>
             </div>
         </div>
     <% } %>
 </div>
+
 </body>
 </html>
