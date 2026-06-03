@@ -16,11 +16,8 @@
         playerName = "";
     }
 
-    // サーバーからこのプレイヤーの5×5ビンゴカードを取得
-    List<List<String>> bingoCard = null;
-    if (game != null && !playerName.isEmpty()) {
-        bingoCard = game.getPlayerCard(playerName);
-    }
+    // 【修正完了】セッション（記憶部屋）から直接プレイヤーの5×5カードを取り出す形に統一
+    List<List<String>> bingoCard = (List<List<String>>) session.getAttribute("card");
 %>
 <!DOCTYPE html>
 <html>
@@ -43,17 +40,16 @@
         .input-text { padding: 10px; font-size: 16px; width: 80%; max-width: 300px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px; text-align: center; }
         .list-box { text-align: left; background: #f9f9f9; padding: 10px; border-radius: 5px; margin-top: 20px; }
         
-        /* ビンゴカード専用の綺麗なスタイル設定 */
+        /* ビンゴカード専用のスタイル設定 */
         .bingo-table { margin: 20px auto; border-collapse: collapse; background: #fff; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
         .bingo-cell { width: 60px; height: 60px; border: 2px solid #ddd; font-size: 22px; font-weight: bold; text-align: center; vertical-align: middle; color: #333; }
-        /* 真ん中のFREEマスや、当選した数字のマスを赤く染める設定 */
         .hit { background-color: #ff6b6b !important; color: white !important; }
         .free-cell { background-color: #ffe3e3; color: #ff6b6b; font-size: 14px; }
     </style>
 
     <% if (game != null) { %>
     <script>
-        // 【大山さん大金星の低燃費モード】10秒ごとに裏側で静かに最新の数字や順位、カードの状態を問い合わせる
+        // 【大山さん大金星の低燃費モード】10秒ごとに裏側で最新の情報を問い合わせる
         function checkUpdate() {
             fetch('BingoServlet?userType=player&playerName=<%= java.net.URLEncoder.encode(playerName, "UTF-8") %>')
                 .then(response => {
@@ -75,7 +71,7 @@
                     
                     let newNumberBox = doc.querySelector('.number-box');
                     let newListBox = doc.querySelector('.list-box');
-                    let newBingoTable = doc.querySelector('.bingo-table'); // カードの部分も自動更新に追従
+                    let newBingoTable = doc.querySelector('.bingo-table');
                     
                     if (newNumberBox) document.querySelector('.number-box').innerHTML = newNumberBox.innerHTML;
                     if (newListBox) document.querySelector('.list-box').innerHTML = newListBox.innerHTML;
@@ -86,7 +82,7 @@
 
         setInterval(checkUpdate, 10000);
 
-        // 【新機能】リーチ・ビンゴの「0秒即時送信」ギミック
+        // リーチ・ビンゴの「0秒即時送信」ギミック
         function sendAction(actionType, buttonElement) {
             buttonElement.disabled = true;
             setTimeout(() => { buttonElement.disabled = false; }, 1500);
@@ -135,7 +131,6 @@
             <%= game.getDrawnNumbers().isEmpty() ? "待機中" : game.getDrawnNumbers().get(game.getDrawnNumbers().size() - 1) %>
         </div>
 
-        <!-- 🚀 ここに5×5のビンゴカードを表示するプログラムを追加しました！ -->
         <% if (bingoCard != null) { %>
             <table class="bingo-table">
                 <% for (int r = 0; r < 5; r++) { %>
@@ -154,7 +149,7 @@
                 <% } %>
             </table>
         <% } else { %>
-            <p style="color:red; font-weight:bold;">カード情報を取得できませんでした。</p>
+            <p style="color:red; font-weight:bold;">カード情報を取得できませんでした。一度、最初からページを開き直してください。</p>
         <% } %>
 
         <div style="margin-top: 20px;">
