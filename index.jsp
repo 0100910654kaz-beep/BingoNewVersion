@@ -1,216 +1,119 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
-<%@ page import="servlet.BingoGame" %>
-<%@ page import="servlet.PlayerResult" %>
 <%@ page import="java.util.List" %>
 <%@ page import="java.util.ArrayList" %>
 <%@ page import="java.util.Collections" %>
 <%
-    BingoGame game = (BingoGame) request.getAttribute("game");
-    String error = (String) request.getAttribute("error");
-    String gameId = (game != null) ? game.getGameId() : "";
-    
-    String playerName = (String) request.getAttribute("confirmedPlayerName");
+    String playerName = (String) session.getAttribute("playerName");
     if (playerName == null) {
-        playerName = (String) session.getAttribute("myConfirmedName");
+        playerName = "ゲストプレイヤー";
     }
-    if (playerName == null) { playerName = ""; }
 
-    List<List<String>> bingoCard = (List<List<String>>) session.getAttribute("card");
-
-    List<Integer> reverseDrawnNumbers = new ArrayList<>();
-    int totalDrawn = 0;
-    if (game != null) {
-        reverseDrawnNumbers.addAll(game.getDrawnNumbers());
-        totalDrawn = reverseDrawnNumbers.size();
-        Collections.reverse(reverseDrawnNumbers);
-    }
-    // 引けば引くほど減る残球カウント（75から引いた数をマイナス）
-    int remainingBalls = 75 - totalDrawn;
-
-    boolean myBingo = false;
-    if (game != null && !playerName.isEmpty()) {
-        for (PlayerResult p : game.getBingoPlayers()) {
-            if (p.getPlayerName().equals(playerName)) {
-                myBingo = true;
-                break;
-            }
+    int[][] card = (int[][]) session.getAttribute("bingoCard");
+    if (card == null) {
+        card = new int[5][5];
+        List<Integer> b = new ArrayList<>();
+        List<Integer> iList = new ArrayList<>();
+        List<Integer> n = new ArrayList<>();
+        List<Integer> g = new ArrayList<>();
+        List<Integer> o = new ArrayList<>();
+        
+        for(int i=1; i<=15; i++) b.add(i);
+        for(int i=16; i<=30; i++) iList.add(i);
+        for(int i=31; i<=45; i++) n.add(i);
+        for(int i=46; i<=60; i++) g.add(i);
+        for(int i=61; i<=75; i++) o.add(i);
+        
+        Collections.shuffle(b);
+        Collections.shuffle(iList);
+        Collections.shuffle(n);
+        Collections.shuffle(g);
+        Collections.shuffle(o);
+        
+        for(int row=0; row<5; row++) {
+            card[row][0] = b.get(row);
+            card[row][1] = iList.get(row);
+            card[row][2] = n.get(row);
+            card[row][3] = g.get(row);
+            card[row][4] = o.get(row);
         }
-    }
-    
-    boolean myReach = false;
-    if (game != null && !playerName.isEmpty() && !myBingo) {
-        for (PlayerResult p : game.getReachPlayers()) {
-            if (p.getPlayerName().equals(playerName)) {
-                myReach = true;
-                break;
-            }
-        }
+        card[2][2] = 0; // FREE
+        session.setAttribute("bingoCard", card);
     }
 %>
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ビンゴ大会 - プレイヤー画面</title>
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <title>マイスマートビンゴカード</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background-color: #f0f0f0; padding: 20px; }
-        .container { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        h1 { color: #ff6b6b; margin-top: 5px; }
-        .error { color: red; font-weight: bold; margin-bottom: 20px; }
-        .info-box { background: #eef2f3; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
-        /* 誤翻訳「休憩中」対策：ハイフン表記で誤魔化す */
-        .number-box { font-size: 48px; font-weight: bold; color: #2b2b2b; background: #ffe3e3; display: inline-block; padding: 10px 40px; border-radius: 10px; margin: 10px 0; min-width: 100px; }
-        .input-text { padding: 10px; font-size: 16px; width: 80%; max-width: 300px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px; text-align: center; }
-        .list-box { text-align: left; background: #f9f9f9; padding: 10px; border-radius: 5px; margin-top: 20px; }
-        
-        .status-panel { font-size: 22px; font-weight: bold; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
-        .status-normal { background: #e3f2fd; color: #2196f3; }
-        .status-reach { background: #fff3e0; color: #e65100; border: 2px solid #ffb74d; animation: pulse 0.5s infinite alternate; }
-        .status-bingo { background: #fffde7; color: #b79500; border: 2px solid #ffd700; animation: goldPulse 0.5s infinite alternate; font-size: 24px; }
-
-        .bingo-table { margin: 15px auto; border-collapse: collapse; background: #fff; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
-        .bingo-cell { width: 60px; height: 60px; border: 2px solid #ddd; font-size: 22px; font-weight: bold; text-align: center; vertical-align: middle; color: #333; }
-        .hit { background-color: #ff6b6b !important; color: white !important; }
-        .free-cell { background-color: #ffe3e3; color: #ff6b6b; font-size: 14px; }
-
-        .bottom-name-display { font-size: 24px; font-weight: bold; color: #333; margin: 15px 0; background: #fff9db; padding: 10px; border-radius: 6px; border: 1px dashed #fab005; }
-
-        .history-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 10px; }
-        .history-cell { background: #e0e0e0; padding: 8px; font-size: 16px; font-weight: bold; border-radius: 4px; text-align: center; color: #555; }
-        
-        @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.02); } }
-        @keyframes goldPulse { from { transform: scale(1); box-shadow: 0 0 10px #ffd700; } to { transform: scale(1.04); box-shadow: 0 0 20px #ffd700; } }
+        body { font-family: Arial, sans-serif; background-color: #f7f9fa; padding: 15px; text-align: center; margin: 0; }
+        .card-container { max-width: 450px; margin: 0 auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h2 { margin: 5px 0; color: #333; }
+        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 15px 0; }
+        .cell { aspect-ratio: 1; background: #e9ecef; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: bold; color: #333; cursor: pointer; border: 2px solid #dee2e6; }
+        .cell.hit { background: #ff6b6b !important; color: white !important; border-color: #fa5252; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); }
+        .cell.free { background: #ffe3e3; color: #ff6b6b; font-size: 14px; }
+        .btn-box { display: flex; justify-content: space-around; margin-top: 20px; gap: 10px; }
+        .btn { flex: 1; padding: 12px; font-size: 18px; font-weight: bold; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        .btn-reach { background: #fcc419; color: #333; }
+        .btn-bingo { background: #37b24d; }
     </style>
-
-    <% if (game != null) { %>
     <script>
-        let alreadyBingo = <%= myBingo %>;
-        let isFirstLoad = true; 
+        let hitNumbers = new Set([0]);
 
-        function launchFireworks() {
-            let duration = 6 * 1000;
-            let end = Date.now() + duration;
-            (function frame() {
-                confetti({ particleCount: 7, angle: 60, spread: 65, origin: { x: 0, y: 0.8 } });
-                confetti({ particleCount: 7, angle: 120, spread: 65, origin: { x: 1, y: 0.8 } });
-                if (Date.now() < end) { requestAnimationFrame(frame); }
-            }());
-        }
-
-        window.onload = function() {
-            if (alreadyBingo && <%= totalDrawn %> > 0) { launchFireworks(); }
-            isFirstLoad = false;
-        };
-
-        function checkUpdate() {
-            fetch('BingoServlet?userType=player&playerName=<%= java.net.URLEncoder.encode(playerName, "UTF-8") %>')
-                .then(response => response.text())
-                .then(html => {
-                    if(!html) return;
-                    let parser = new DOMParser();
-                    let doc = parser.parseFromString(html, 'text/html');
-                    
-                    if (doc.querySelector('.error')) { window.location.reload(); return; }
-                    
-                    document.querySelector('.number-box').innerHTML = doc.querySelector('.number-box').innerHTML;
-                    document.querySelector('.bingo-table').innerHTML = doc.querySelector('.bingo-table').innerHTML;
-                    document.querySelector('.history-grid').innerHTML = doc.querySelector('.history-grid').innerHTML;
-                    document.getElementById('statusArea').innerHTML = doc.getElementById('statusArea').innerHTML;
-                    document.getElementById('ballCounter').innerHTML = doc.getElementById('ballCounter').innerHTML;
-
-                    let statePanel = doc.querySelector('.status-panel');
-                    if (statePanel && statePanel.classList.contains('status-bingo') && !alreadyBingo && !isFirstLoad) {
-                        alreadyBingo = true;
-                        launchFireworks();
+        function checkStatus() {
+            fetch('BingoServlet?action=status')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.started && data.drawnNumbers) {
+                        data.drawnNumbers.forEach(num => hitNumbers.add(num));
+                        updateCardVisuals();
                     }
-                })
-                .catch(err => console.log(err));
+                });
         }
-        setInterval(checkUpdate, 5000);
+
+        function updateCardVisuals() {
+            document.querySelectorAll('.cell').forEach(cell => {
+                let num = parseInt(cell.getAttribute('data-num'));
+                if (hitNumbers.has(num)) {
+                    cell.classList.add('hit');
+                }
+            });
+        }
+
+        window.onload = () => {
+            checkStatus();
+            setInterval(checkStatus, 3000);
+        };
     </script>
-    <% } %>
 </head>
 <body>
-<div class="container">
-    <h1>🎉 ビンゴ大会 🎉</h1>
-
-    <% if (error != null) { %>
-        <div class="error"><%= error %></div>
-    <% } %>
-
-    <% if (game == null) { %>
-        <div class="info-box">
-            <p>参加する部屋の「部屋番号」を入力してください。</p>
-            <form action="BingoServlet" method="get">
-                <input type="hidden" name="action" value="join">
-                <input type="text" name="gameId" class="input-text" placeholder="8桁の部屋番号を入力" required><br>
-                <input type="text" name="playerName" class="input-text" placeholder="あなたの名前"><br>
-                <button type="submit" style="padding: 12px 24px; font-size: 18px; font-weight: bold; color: white; background-color: #4caf50; border: none; border-radius: 5px; cursor: pointer; margin: 10px;">ゲームに参加する</button>
-            </form>
-        </div>
-    <% } else { %>
-        <div class="info-box">
-            <strong>部屋番号:</strong> <%= gameId %>&nbsp;&nbsp;|&nbsp;&nbsp;
-            <strong>名前:</strong> <span style="color:#2b8a3e; font-weight:bold;"><%= playerName %> さん</span>
-        </div>
-
-        <div id="statusArea">
-            <% if (myBingo) { %>
-                <div class="status-panel status-bingo">👑 ビンゴ達成！！！おめでとう！ 🏆</div>
-            <% } else if (myReach) { %>
-                <div class="status-panel status-reach">🔥 リーチ発生中！ドキドキ… 🎯</div>
-            <% } else { %>
-                <div class="status-panel status-normal">抽選中...そのままお待ちください</div>
-            <% } %>
-        </div>
-
-        <p style="margin-bottom:0;">現在の最新の当選番号</p>
-        <div class="number-box">
-            <%= game.getDrawnNumbers().isEmpty() ? "---" : game.getDrawnNumbers().get(game.getDrawnNumbers().size() - 1) %>
-        </div>
-        
-        <div id="ballCounter" style="font-size:16px; font-weight:bold; color:#555; margin-bottom:10px;">
-            残りの玉数: <%= remainingBalls %> / 75 球
-        </div>
-
-        <% if (bingoCard != null) { %>
-            <table class="bingo-table">
-                <% for (int r = 0; r < 5; r++) { %>
-                    <tr>
-                        <% for (int c = 0; c < 5; c++) { 
-                            String num = bingoCard.get(r).get(c);
-                            boolean isHit = game.getDrawnNumbers().contains(Integer.parseInt(num)) || num.equals("0");
-                            if (num.equals("0")) { %>
-                                <td class="bingo-cell free-cell hit">FREE</td>
-                            <% } else { %>
-                                <td class="bingo-cell <%= isHit ? "hit" : "" %>"><%= num %></td>
-                            <% } 
-                        } %>
-                    </tr>
-                <% } %>
-            </table>
-        <% } %>
-
-        <div class="bottom-name-display">
-            👤 プレイヤー: <%= playerName %> さん
-        </div>
-
-        <div class="list-box">
-            <h3 style="margin: 5px 0;">📊 出た数字一覧</h3>
-            <div class="history-grid">
-                <% for (int i = 0; i < reverseDrawnNumbers.size(); i++) { 
-                    int num = reverseDrawnNumbers.get(i);
-                    if (i == 0) { %>
-                        <div class="history-cell" style="background:#ff6b6b; color:white;"><%= num %></div>
-                    <% } else { %>
-                        <div class="history-cell"><%= num %></div>
-                    <% }
-                } %>
-            </div>
-        </div>
-    <% } %>
+<div class="card-container">
+    <h2><%= playerName %> さんのカード</h2>
+    <div class="grid">
+        <% for(int r=0; r<5; r++) {
+            for(int c=0; c<5; c++) {
+                int val = card[r][c];
+                if (r==2 && c==2) { %>
+                    <div class="cell free hit" data-num="0">FREE</div>
+                <% } else { %>
+                    <div class="cell" data-num="<%= val %>"><%= val %></div>
+                <% }
+            }
+        } %>
+    </div>
+    <div class="btn-box">
+        <form action="BingoServlet" method="post" style="flex:1;">
+            <input type="hidden" name="action" value="reach">
+            <input type="hidden" name="playerName" value="<%= playerName %>">
+            <button type="submit" class="btn btn-reach">🔥 リーチ！</button>
+        </form>
+        <form action="BingoServlet" method="post" style="flex:1;">
+            <input type="hidden" name="action" value="bingo">
+            <input type="hidden" name="playerName" value="<%= playerName %>">
+            <button type="submit" class="btn btn-bingo">🏆 ビンゴ！！</button>
+        </form>
+    </div>
 </div>
 </body>
 </html>
