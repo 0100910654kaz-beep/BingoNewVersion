@@ -64,7 +64,6 @@
             }
         }
 
-        // 🚀【大画面劇的リニューアル】左右分割で絶対にかぶらない配置構造
         function openProjectorScreen() {
             screenWindow = window.open("", "BingoProjector", "width=1280,height=800,top=50,left=50,resizable=yes");
             
@@ -144,4 +143,94 @@
                 .then(response => response.text())
                 .then(html => {
                     let parser = new DOMParser();
-                    let
+                    let doc = parser.parseFromString(html, 'text/html');
+                    if(doc.querySelector('.admin-container')) {
+                        document.querySelector('.admin-container').innerHTML = doc.querySelector('.admin-container').innerHTML;
+                        updateProjectorData();
+                    }
+                });
+        }, 5000);
+
+        window.onload = function() {
+            screenWindow = window.open("", "BingoProjector");
+            if (screenWindow && screenWindow.document.getElementById('p-num') !== null) {
+                updateProjectorData();
+            }
+        };
+    </script>
+</head>
+<body>
+
+<div class="admin-container">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" class="btn btn-reset" onclick="confirmReset()">🔄 リセット [Esc]</button>
+        <h1>🎤 司会者コントロール画面 🎤</h1>
+        <button type="button" class="btn btn-screen" onclick="openProjectorScreen()">📺 大画面を開く</button>
+    </div>
+
+    <% if (game == null) { %>
+        <div class="info-panel" style="background: #ffe3e3;">
+            <p>まだビンゴゲームの部屋が作成されていません。</p>
+            <form action="BingoServlet" method="get">
+                <input type="hidden" name="action" value="create">
+                <label>部屋の有効日数: </label>
+                <input type="number" name="validDays" value="8" style="width:50px; padding:5px; text-align:center;"> 日間<br><br>
+                <button type="submit" class="btn btn-draw" style="box-shadow:none;">🚀 新規ビンゴ部屋(88888888)を開始する</button>
+            </form>
+        </div>
+    <% } else { %>
+        <div class="info-panel">
+            <strong>現在の管理部屋ID:</strong> <span style="color:#4a90e2; font-weight:bold;"><%= gameId %></span> &nbsp;&nbsp;|&nbsp;&nbsp;
+            <strong>現在の総参加人数:</strong> <span style="color:#2b8a3e; font-weight:bold;"><%= game.getPlayerCount() %> 名</span>
+        </div>
+
+        <p style="font-size: 18px; margin-bottom: 0;">抽選された最新の数字</p>
+        <div class="big-number"><%= game.getDrawnNumbers().isEmpty() ? "---" : game.getDrawnNumbers().get(game.getDrawnNumbers().size() - 1) %></div>
+
+        <div id="adminBallCounter" style="font-size:18px; font-weight:bold; color:#555; margin-bottom:10px;">
+            残りの玉数: <%= remainingBalls %> / 75 球
+        </div>
+
+        <div class="control-box">
+            <a href="BingoServlet?action=draw" id="drawButton" class="btn btn-draw" onclick="setTimeout(updateProjectorData, 50);">🎲 次の数字を引く [Enter]</a>
+        </div>
+
+        <div class="flex-box">
+            <div class="panel" style="flex: 1.2;">
+                <h3>📊 出た数字の履歴</h3>
+                <div class="history-grid">
+                    <% for (int i = 0; i < reverseDrawnNumbers.size(); i++) { 
+                        int num = reverseDrawnNumbers.get(i);
+                        if (i == 0) { %>
+                            <div class="history-cell newest"><%= num %></div>
+                        <% } else { %>
+                            <div class="history-cell"><%= num %></div>
+                        <% }
+                    } %>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>🏆 ビンゴ達成者一覧</h3>
+                <ul id="bingoList">
+                    <% 
+                       List<String> rankedHTML = game.getRankedBingoListHTML();
+                       for (String line : rankedHTML) { %>
+                           <%= line %>
+                    <% } 
+                       if (rankedHTML.isEmpty()) { %> <p style="color:#888;">まだビンゴした人はいません</p> <% } %>
+                </ul>
+
+                <h3 style="margin-top: 25px;">🔥 リーチの人</h3>
+                <ul id="adminReachList">
+                    <% for (PlayerResult p : game.getReachPlayers()) { %>
+                        <li><strong><%= p.getPlayerName() %> さん</strong> <span style="color: #ff9800; font-size: 14px; font-weight: bold;">（あと <%= game.getWaitNumbers(p.getPlayerName()) %> 番でビンゴ！）</span></li>
+                    <% } 
+                       if (game.getReachPlayers().isEmpty()) { %> <p style="color:#888;">まだリーチの人はいません</p> <% } %>
+                </ul>
+            </div>
+        </div>
+    <% } %>
+</div>
+</body>
+</html>
