@@ -3,24 +3,21 @@ FROM tomcat:10.1-jdk11-corretto
 # タイムゾーンを日本に設定
 ENV TZ=Asia/Tokyo
 
-# 既存のROOTアプリケーションを削除
-RUN rm -rf /usr/local/tomcat/webapps/ROOT
+# 既存のROOTアプリケーションを削除し、正しい配置用のフォルダを作成
+RUN rm -rf /usr/local/tomcat/webapps/ROOT && \
+    mkdir -p /usr/local/tomcat/webapps/ROOT/WEB-INF/classes
 
 # 作業スペースを作成
 WORKDIR /app
 
-# リポジトリ内のすべてのファイルを一旦作業スペースにコピー
+# リポジトリ内のすべてのファイルを一旦コピー
 COPY . .
 
-# JSPファイルをTomcatのROOT直下に配置
-RUN mkdir -p /usr/local/tomcat/webapps/ROOT && \
-    find . -name "index.jsp" -exec cp {} /usr/local/tomcat/webapps/ROOT/ \; && \
+# JSPファイル（プレイヤー画面・司会者画面）をROOT直下に確実に配置
+RUN find . -name "index.jsp" -exec cp {} /usr/local/tomcat/webapps/ROOT/ \; && \
     find . -name "admin.jsp" -exec cp {} /usr/local/tomcat/webapps/ROOT/ \;
 
-# Javaファイルをコンパイルして配置するディレクトリを作成
-RUN mkdir -p /usr/local/tomcat/webapps/ROOT/WEB-INF/classes
-
-# Javaファイルをフォルダー内から自動で見つけてTomcat 10の共通ライブラリを使ってコンパイル
+# JavaファイルをTomcatの共通ライブラリを使ってコンパイルし、classes直下に配置
 RUN find . -name "*.java" | xargs javac -classpath "/usr/local/tomcat/lib/*" -d /usr/local/tomcat/webapps/ROOT/WEB-INF/classes
 
 # ポート番号の設定（Render用）
