@@ -29,10 +29,10 @@
         .big-number { font-size: 80px; font-weight: bold; color: #ff6b6b; background: #ffe3e3; display: inline-block; padding: 10px 50px; border-radius: 15px; margin: 15px 0; border: 3px solid #ff6b6b; }
         .control-box { margin: 20px 0; }
         .btn { display: inline-block; padding: 14px 28px; font-size: 20px; font-weight: bold; color: white; border: none; border-radius: 6px; cursor: pointer; margin: 10px; text-decoration: none; }
-        .btn-draw { background-color: #2b8a3e; box-shadow: 0 4px #1e622b; }
+        .btn-draw { background-color: #2b8a3e; box-shadow: 0 4px #1e622b; border: none; }
         .btn-draw:active { transform: translateY(4px); box-shadow: none; }
-        .btn-reset { background-color: #e63946; font-size: 16px; padding: 10px 20px; }
-        .btn-screen { background-color: #4a90e2; font-size: 16px; padding: 10px 20px; }
+        .btn-reset { background-color: #e63946; font-size: 16px; padding: 10px 20px; border: none; }
+        .btn-screen { background-color: #4a90e2; font-size: 16px; padding: 10px 20px; border: none; }
         
         .flex-box { display: flex; justify-content: space-between; margin-top: 30px; gap: 20px; }
         .panel { flex: 1; background: #f9f9f9; padding: 15px; border-radius: 8px; text-align: left; box-shadow: inset 0 0 5px rgba(0,0,0,0.05); }
@@ -47,6 +47,7 @@
     </style>
 
     <script>
+        // 大画面ウィンドウへの参照を子・親でしっかり紐付ける仕組み
         let screenWindow = null;
 
         window.addEventListener("keydown", function(event) {
@@ -63,49 +64,62 @@
             }
         }
 
-        // 🚀【大改善】ホワイトアウト（真っ白エラー）を絶対に起こさない大画面制御
+        // 大画面を開く、またはすでに開いている場合は再接続するロジック
         function openProjectorScreen() {
             screenWindow = window.open("", "BingoProjector", "width=1000,height=750,top=100,left=100,resizable=yes");
             
+            // 初回開いた時用のHTML骨組み（これ自体は一度ロードすればリロード不要）
             let htmlContent = '<html><head><title>ビンゴ中継大画面</title>' +
             '<style>' +
             'body { font-family: Arial, sans-serif; background-color: #1a1a1a; color: white; text-align: center; padding: 40px; margin: 0; }' +
             '.title { font-size: 42px; color: #ff6b6b; font-weight: bold; margin-bottom: 20px; letter-spacing: 4px; }' +
-            '.num-display { font-size: 180px; font-weight: bold; color: #fff; background: #ff6b6b; padding: 20px 100px; border-radius: 30px; display:inline-block; margin:20px 0; line-height:1; }' +
-            '.grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 15px; max-width: 1100px; margin: 0 auto; padding: 20px; background: #2a2a2a; border-radius: 15px; }' +
-            '.cell { background: #444; padding: 15px 0; font-size: 32px; font-weight: bold; border-radius: 8px; color: #bbb; }' +
-            '.cell.new { background: #ff6b6b; color: white; font-size: 42px; box-shadow: 0 0 15px #ff6b6b; }' +
+            '.num-display { font-size: 180px; font-weight: bold; color: #fff; background: #ff6b6b; padding: 20px 100px; border-radius: 30px; display:inline-block; margin:20px 0; line-height:1; min-width:200px; }' +
+            '.grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 15px; max-width: 1100px; margin: 0 auto; padding: 20px; background: #2a2a2a; border-radius: 15px; min-height:80px; }' +
+            '.cell { background: #444; padding: 15px 0; font-size: 32px; font-weight: bold; border-radius: 8px; color: #bbb; text-align:center; }' +
+            '.cell.new { background: #ff6b6b; color: white; font-size: 42px; box-shadow: 0 0 25px #ff6b6b; animation: scaleUp 0.4s ease-out; }' +
             '.winner-box { font-size: 24px; background: #333; padding: 15px; border-radius: 10px; max-width: 600px; margin: 30px auto 0; text-align: left; border-left: 8px solid #ff6b6b; }' +
+            '@keyframes scaleUp { from { transform:scale(0.5); } to { transform:scale(1); } }' +
             '</style></head><body>' +
             '<div class="title">🎉 ビンゴ大会 抽選生中継 🎉</div>' +
             '<div><div style="font-size:28px; color:#aaa;">現在の当選番号</div><div class="num-display" id="p-num">待機中</div></div>' +
-            '<div id="p-ball" style="font-size:24px; margin:10px 0; color:#ffb74d;"></div>' +
+            '<div id="p-ball" style="font-size:24px; margin:10px 0; color:#ffb74d; font-weight:bold;"></div>' +
             '<div style="font-size:28px; text-align:left; max-width:1100px; margin:20px auto 10px; color:#aaa;">📊 出た数字の履歴（最新が左上）</div>' +
             '<div class="grid" id="p-grid"></div>' +
             '<div class="winner-box"><strong>🏆 ビンゴ達成者上位:</strong><br><ul id="p-list"></ul></div>' +
             '</body></html>';
             
-            screenWindow.document.open();
-            screenWindow.document.write(htmlContent);
-            screenWindow.document.close();
+            // すでに開いている場合は中身を上書きしない（ホワイトアウトを防ぐため）
+            if (screenWindow.document.getElementById('p-num') === null) {
+                screenWindow.document.open();
+                screenWindow.document.write(htmlContent);
+                screenWindow.document.close();
+            }
             updateProjectorData(); 
         }
 
-        // 親から子画面に、リロードなしでデータを直接送り込む（ホワイトアウト対策）
+        // 🚀【超重要】数字が引かれた瞬間、またはデータ同期時に大画面のHTMLを直接瞬時に書き換える処理
         function updateProjectorData() {
+            // すでに大画面が立ち上がっており、閉じられていない場合のみ実行
             if (screenWindow && !screenWindow.closed) {
-                let pNum = screenWindow.document.getElementById('p-num');
-                let pGrid = screenWindow.document.getElementById('p-grid');
-                let pList = screenWindow.document.getElementById('p-list');
-                let pBall = screenWindow.document.getElementById('p-ball');
+                try {
+                    let pNum = screenWindow.document.getElementById('p-num');
+                    let pGrid = screenWindow.document.getElementById('p-grid');
+                    let pList = screenWindow.document.getElementById('p-list');
+                    let pBall = screenWindow.document.getElementById('p-ball');
 
-                if(pNum) pNum.innerText = document.querySelector('.big-number').innerText;
-                if(pBall) pBall.innerText = document.getElementById('adminBallCounter').innerText;
-                if(pGrid) pGrid.innerHTML = document.querySelector('.history-grid').innerHTML.replace(/history-cell/g, 'cell').replace(/newest/g, 'new');
-                if(pList) pList.innerHTML = document.getElementById('bingoList').innerHTML;
+                    // 司会者画面の現在の最新データをそのままコピーして瞬時に書き換え
+                    if(pNum) pNum.innerText = document.querySelector('.big-number').innerText;
+                    if(pBall) pBall.innerText = document.getElementById('adminBallCounter').innerText;
+                    if(pGrid) pGrid.innerHTML = document.querySelector('.history-grid').innerHTML.replace(/history-cell/g, 'cell').replace(/newest/g, 'new');
+                    if(pList) pList.innerHTML = document.getElementById('bingoList').innerHTML;
+                } catch(e) {
+                    // ページ遷移直後などで一時的にエラーになった場合はスキップ
+                    console.log("大画面へのデータ書き換え待機中...");
+                }
             }
         }
 
+        // 5秒ごとの司会者画面（裏側）データ自動更新ロジック
         setInterval(function() {
             fetch('BingoServlet?userType=admin')
                 .then(response => response.text())
@@ -114,10 +128,19 @@
                     let doc = parser.parseFromString(html, 'text/html');
                     if(doc.querySelector('.admin-container')) {
                         document.querySelector('.admin-container').innerHTML = doc.querySelector('.admin-container').innerHTML;
-                        updateProjectorData(); // 通信が成功するたびに大画面を書き換え
+                        // 裏側で通信が成功したら大画面も自動同期
+                        updateProjectorData();
                     }
                 });
         }, 5000);
+
+        // 初回ロード時、もしすでに大画面の名前を持つウィンドウがあれば自動で同期構造を復元
+        window.onload = function() {
+            screenWindow = window.open("", "BingoProjector");
+            if (screenWindow && screenWindow.document.getElementById('p-num') !== null) {
+                updateProjectorData();
+            }
+        };
     </script>
 </head>
 <body>
@@ -153,7 +176,7 @@
         </div>
 
         <div class="control-box">
-            <a href="BingoServlet?action=draw" id="drawButton" class="btn btn-draw">🎲 次の数字を引く [Enter]</a>
+            <a href="BingoServlet?action=draw" id="drawButton" class="btn btn-draw" onclick="setTimeout(updateProjectorData, 50);">🎲 次の数字を引く [Enter]</a>
         </div>
 
         <div class="flex-box">
