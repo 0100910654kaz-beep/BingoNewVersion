@@ -31,8 +31,6 @@
         .control-box { margin: 20px 0; }
         .btn { display: inline-block; padding: 14px 28px; font-size: 20px; font-weight: bold; color: white; border: none; border-radius: 6px; cursor: pointer; margin: 10px; text-decoration: none; }
         .btn-draw { background-color: #2b8a3e; box-shadow: 0 4px #1e622b; border: none; }
-        .btn-draw:active { transform: translateY(4px); box-shadow: none; }
-        .btn-reset { background-color: #e63946; font-size: 16px; padding: 10px 20px; border: none; }
         
         .flex-box { display: flex; justify-content: space-between; margin-top: 30px; gap: 20px; }
         .panel { flex: 1; background: #f9f9f9; padding: 15px; border-radius: 8px; text-align: left; box-shadow: inset 0 0 5px rgba(0,0,0,0.05); }
@@ -55,7 +53,7 @@
             <p>まだビンゴゲームの部屋が作成されていません。</p>
             <form action="BingoServlet" method="get">
                 <input type="hidden" name="action" value="create">
-                <button type="submit" class="btn btn-draw" style="box-shadow:none;">🚀 新規ビンゴ部屋を開始する</button>
+                <button type="submit" class="btn btn-draw">🚀 新規ビンゴ部屋を開始する</button>
             </form>
         </div>
     <% } else { %>
@@ -93,18 +91,20 @@
             <div class="panel">
                 <h3>🏆 ビンゴ達成者一覧</h3>
                 <ul>
-                    <% 
-                       List<String> rankedHTML = game.getRankedBingoListHTML();
-                       for (String line : rankedHTML) { %>
-                           <%= line %>
-                    <% } %>
+                    <% if (game.getBingoPlayers() != null) {
+                        for (PlayerResult p : game.getBingoPlayers()) { %>
+                            <li><strong><%= p.getPlayerName() %> さん</strong></li>
+                    <%  }
+                       } %>
                 </ul>
 
                 <h3 style="margin-top: 25px;">🔥 リーチの人</h3>
                 <ul>
-                    <% for (PlayerResult p : game.getReachPlayers()) { %>
-                        <li><strong><%= p.getPlayerName() %> さん</strong></li>
-                    <% } %>
+                    <% if (game.getReachPlayers() != null) {
+                        for (PlayerResult p : game.getReachPlayers()) { %>
+                            <li><strong><%= p.getPlayerName() %> さん</strong></li>
+                    <%  }
+                       } %>
                 </ul>
             </div>
         </div>
