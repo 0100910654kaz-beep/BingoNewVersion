@@ -93,7 +93,7 @@
                 <ul>
                     <% if (game.getBingoPlayers() != null) {
                         for (PlayerResult p : game.getBingoPlayers()) { %>
-                            <li><strong><%= p.getPlayerName() %> さん</strong></li>
+                            <li><strong><%= game.getPlayerRank(p.getPlayerName()) %>位: <%= p.getPlayerName() %> さん</strong></li>
                     <%  }
                        } %>
                 </ul>
